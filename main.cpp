@@ -13,6 +13,19 @@
 static constexpr auto DUMMY_DATA_SIZE{ std::numeric_limits<int>::max() / 32 };
 using DUMMY_DATA = std::array<std::byte, DUMMY_DATA_SIZE>;
 
+static void dummy_proccess_multi(DUMMY_DATA& data, long long& acc)
+{
+    static constinit std::mutex mtx{ };
+    std::lock_guard const g{ mtx };
+    for (auto const& el : data)
+    {
+        double const x{ std::to_integer<int>(el) / 255. };
+        double const y{ std::sin(std::cos(x)) };
+
+        acc += static_cast<int>(std::round(y)) % 2;
+    }
+}
+
 static void dummy_proccess(DUMMY_DATA& data, long long& acc)
 {
     for (auto const& el : data)
@@ -53,7 +66,7 @@ int main()
         acc = 0ll;
         for (auto& dummy : data)
         {
-            workers.push_back(std::thread{ dummy_proccess, std::ref(dummy), std::ref(acc) });
+            workers.push_back(std::thread{ dummy_proccess_multi, std::ref(dummy), std::ref(acc) });
         }
         for (auto& worker : workers)
         {
