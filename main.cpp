@@ -9,14 +9,21 @@
 #include <thread>
 #include <cmath>
 #include <mutex>
+#include <functional>
+#include <numeric>
 
-static constexpr auto DUMMY_DATA_SIZE{ std::numeric_limits<int>::max() / 32 };
+static constexpr auto DUMMY_DATA_SIZE{ std::numeric_limits<int>::max() / 1024 };
 using DUMMY_DATA = std::array<std::byte, DUMMY_DATA_SIZE>;
+using ACC = long long;
+static constexpr auto ACC_SIZE{ sizeof(ACC) };
+static constexpr decltype(ACC_SIZE) CACHE_DDR_BAND_WIDTH{ 64 };
+static constexpr auto CACHE_DDR_PADDING{ CACHE_DDR_BAND_WIDTH - ACC_SIZE };
+using PADDING = std::array<std::byte, CACHE_DDR_PADDING>;
+using ACC_PADDED = std::pair<ACC, PADDING>;
 
-static void dummy_proccess_multi(DUMMY_DATA& data, long long& acc)
+
+static void dummy_proccess_multi(DUMMY_DATA& data, ACC& acc) noexcept
 {
-    static constinit std::mutex mtx{ };
-    std::lock_guard const g{ mtx };
     for (auto const& el : data)
     {
         double const x{ std::to_integer<int>(el) / 255. };
@@ -26,7 +33,7 @@ static void dummy_proccess_multi(DUMMY_DATA& data, long long& acc)
     }
 }
 
-static void dummy_proccess(DUMMY_DATA& data, long long& acc)
+static void dummy_proccess(DUMMY_DATA& data, ACC& acc) noexcept
 {
     for (auto const& el : data)
     {
@@ -39,9 +46,8 @@ static void dummy_proccess(DUMMY_DATA& data, long long& acc)
 
 int main()
 {
-    std::vector<DUMMY_DATA> data{ 4 };
-    std::vector<std::thread> workers{ };
-    long long acc{ 0ll };
+    constexpr auto BLOCKS_DATA_COUNT{ 4 };
+    std::vector<DUMMY_DATA> data{ BLOCKS_DATA_COUNT };
     
     for (auto& dummy : data)
     {
@@ -49,6 +55,7 @@ int main()
     }
 
     {
+        ACC acc{ 0ll };
         auto const start_time{ std::chrono::steady_clock::now() };
         for (auto& dummy : data)
         {
@@ -60,22 +67,94 @@ int main()
     }
     std::puts("");
     constexpr int ITERATIONS_COUNT{ 5 };
+    
     for (int i{ 1 }; i <= ITERATIONS_COUNT; ++i)
     {
+        std::vector<std::thread> workers{ };
+        ACC acc{ 0ll };
+
         auto const start_time{ std::chrono::steady_clock::now() };
-        acc = 0ll;
-        for (auto& dummy : data)
+
+        for (auto const [i, block] : std::views::enumerate(data))
         {
-            workers.push_back(std::thread{ dummy_proccess_multi, std::ref(dummy), std::ref(acc) });
+            workers.push_back(std::thread{ dummy_proccess_multi, std::ref(block), std::ref(acc) });
         }
         for (auto& worker : workers)
         {
             worker.join();
         }
-        workers.clear();
+
         auto const end_time{ std::chrono::steady_clock::now() };
-        std::cout << "Done in " << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count() << " ms (4 threads)\n";
+
+        std::cout << "Done in " << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count() << " ms (4 threads write in one field)\n";
         std::cout << "Result: " << acc;
+        std::puts("");
+    }
+
+    for (int i{ 1 }; i <= ITERATIONS_COUNT; ++i)
+    {
+        std::vector<std::thread> workers{ };
+
+        auto const start_time{ std::chrono::steady_clock::now() };
+
+        for (auto const [i, block] : std::views::enumerate(data))
+        {
+            workers.push_back(std::thread{ [dummy = ACC(0)](DUMMY_DATA& block) mutable { dummy_proccess_multi(block, dummy); }, std::ref(block)});
+        }
+        for (auto& worker : workers)
+        {
+            worker.join();
+        }
+
+        auto const end_time{ std::chrono::steady_clock::now() };
+
+        std::cout << "Done in " << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count() << " ms (4 threads write in lamda field)";
+        std::puts("");
+    }
+
+    for (int i{ 1 }; i <= ITERATIONS_COUNT; ++i)
+    {
+        std::vector<std::thread> workers{ };
+        std::array<ACC, BLOCKS_DATA_COUNT> accs{ };
+
+        auto const start_time{ std::chrono::steady_clock::now() };
+
+        for (auto const [i, block] : std::views::enumerate(data))
+        {
+            workers.push_back(std::thread{ dummy_proccess_multi, std::ref(block), std::ref(accs[i])});
+        }
+        for (auto& worker : workers)
+        {
+            worker.join();
+        }
+
+        auto const end_time{ std::chrono::steady_clock::now() };
+
+        std::cout << "Done in " << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count() << " ms (4 threads without padding)\n";
+        std::cout << "Result: " << std::accumulate(accs.cbegin(), accs.cend(), static_cast<ACC>(0));
+        std::puts("");
+    }
+
+    for (int i{ 1 }; i <= ITERATIONS_COUNT; ++i)
+    {
+        std::vector<std::thread> workers{ };
+        std::array<ACC_PADDED, BLOCKS_DATA_COUNT> accs{ };
+        
+        auto const start_time{ std::chrono::steady_clock::now() };
+        
+        for (auto const [i, block] : std::views::enumerate(data))
+        {
+            workers.push_back(std::thread{ dummy_proccess_multi, std::ref(block), std::ref(accs[i].first) });
+        }
+        for (auto& worker : workers)
+        {
+            worker.join();
+        }
+
+        auto const end_time{ std::chrono::steady_clock::now() };
+
+        std::cout << "Done in " << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count() << " ms (4 threads with padding)\n";
+        std::cout << "Result: " << std::accumulate(accs.cbegin(), accs.cend(), static_cast<ACC>(0), [](auto const& lhs, auto const& rhs) -> ACC { return lhs + rhs.first; });
         std::puts("");
     }
 
