@@ -24,6 +24,8 @@ static constexpr auto CACHE_DDR_PADDING{ CACHE_DDR_BAND_WIDTH - ACC_SIZE };
 using PADDING = std::array<std::byte, CACHE_DDR_PADDING>;
 using ACC_PADDED = std::pair<ACC, PADDING>;
 
+static constexpr int ITERATIONS_COUNT{ 5 };
+
 
 static void dummy_process_multi(std::span<std::byte const> data, ACC& acc) noexcept
 {
@@ -63,7 +65,6 @@ static void process_data_in_one_shot(std::vector<DUMMY_DATA> const& data)
         std::cout << "Result: " << acc;
     }
     std::puts("");
-    constexpr int ITERATIONS_COUNT{ 5 };
     
     for (int i{ 1 }; i <= ITERATIONS_COUNT; ++i)
     {
@@ -157,6 +158,38 @@ static void process_data_in_one_shot(std::vector<DUMMY_DATA> const& data)
     std::puts("=========================");
 }
 
+static void process_data_in_multi_shots(std::vector<DUMMY_DATA> const& data)
+{
+    std::puts("=========================");
+
+    for (int i{ 1 }; i <= ITERATIONS_COUNT; ++i)
+    {
+        ACC total{ 0ll };
+
+        auto const start_time{ std::chrono::steady_clock::now() };
+
+        constexpr std::size_t CHUNK_SIZE{ DUMMY_DATA_SIZE / 1'000ull };
+        for (std::size_t j{ 0ull }; j != DUMMY_DATA_SIZE; j += CHUNK_SIZE)
+        {
+            std::array<ACC_PADDED, BLOCKS_DATA_COUNT> accs{ };
+            
+            for (std::vector<std::jthread> workers{ }; auto const& [i, block] : std::views::enumerate(data))
+            {
+                workers.push_back(std::jthread{ dummy_process_multi, std::span{ block.begin() + j, CHUNK_SIZE }, std::ref(accs[i].first)});
+            }
+
+            total += std::accumulate(accs.cbegin(), accs.cend(), static_cast<ACC>(0), [](auto const& lhs, auto const& rhs) -> ACC { return lhs + rhs.first; });
+        }
+
+        auto const end_time{ std::chrono::steady_clock::now() };
+
+        std::cout << "Done in " << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count() << " ms (4 threads with padding)\n";
+        std::cout << "Result: " << total;
+        std::puts("");
+    }
+    std::puts("=========================");
+}
+
 
 int main(int argc, char const* (argv)[])
 {
@@ -168,6 +201,7 @@ int main(int argc, char const* (argv)[])
     }
     
     process_data_in_one_shot(data);
+    process_data_in_multi_shots(data);
 
     return EXIT_SUCCESS;
 }
