@@ -11,9 +11,12 @@
 #include <mutex>
 #include <functional>
 #include <numeric>
+#include <span>
 
-static constexpr auto DUMMY_DATA_SIZE{ std::numeric_limits<int>::max() / 1024 };
+static constexpr auto DUMMY_DATA_SIZE{ 1'000'000 };
 using DUMMY_DATA = std::array<std::byte, DUMMY_DATA_SIZE>;
+static constexpr auto BLOCKS_DATA_COUNT{ 4 };
+
 using ACC = long long;
 static constexpr auto ACC_SIZE{ sizeof(ACC) };
 static constexpr decltype(ACC_SIZE) CACHE_DDR_BAND_WIDTH{ 64 };
@@ -22,7 +25,7 @@ using PADDING = std::array<std::byte, CACHE_DDR_PADDING>;
 using ACC_PADDED = std::pair<ACC, PADDING>;
 
 
-static void dummy_proccess_multi(DUMMY_DATA& data, ACC& acc) noexcept
+static void dummy_process_multi(std::span<std::byte const> data, ACC& acc) noexcept
 {
     for (auto const& el : data)
     {
@@ -33,7 +36,7 @@ static void dummy_proccess_multi(DUMMY_DATA& data, ACC& acc) noexcept
     }
 }
 
-static void dummy_proccess(DUMMY_DATA& data, ACC& acc) noexcept
+static void dummy_process(std::span<std::byte const> data, ACC& acc) noexcept
 {
     for (auto const& el : data)
     {
@@ -44,22 +47,16 @@ static void dummy_proccess(DUMMY_DATA& data, ACC& acc) noexcept
     }
 }
 
-int main()
+static void process_data_in_one_shot(std::vector<DUMMY_DATA> const& data)
 {
-    constexpr auto BLOCKS_DATA_COUNT{ 4 };
-    std::vector<DUMMY_DATA> data{ BLOCKS_DATA_COUNT };
-    
-    for (auto& dummy : data)
-    {
-        std::ranges::generate(dummy, [rng = std::minstd_rand{ }]() mutable { return std::byte{ static_cast<unsigned char>(rng() % 256) }; });
-    }
-
+    std::puts("=========================");
+    std::puts("Process data in one shot");
     {
         ACC acc{ 0ll };
         auto const start_time{ std::chrono::steady_clock::now() };
-        for (auto& dummy : data)
+        for (auto const& dummy : data)
         {
-            dummy_proccess(dummy, acc);
+            dummy_process(dummy, acc);
         }
         auto const end_time{ std::chrono::steady_clock::now() };
         std::cout << "Done in " << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count() << " ms (1 thread)\n";
@@ -75,9 +72,9 @@ int main()
 
         auto const start_time{ std::chrono::steady_clock::now() };
 
-        for (auto const [i, block] : std::views::enumerate(data))
+        for (auto const& [i, block] : std::views::enumerate(data))
         {
-            workers.push_back(std::thread{ dummy_proccess_multi, std::ref(block), std::ref(acc) });
+            workers.push_back(std::thread{ dummy_process_multi, std::span{ block }, std::ref(acc) });
         }
         for (auto& worker : workers)
         {
@@ -97,9 +94,9 @@ int main()
 
         auto const start_time{ std::chrono::steady_clock::now() };
 
-        for (auto const [i, block] : std::views::enumerate(data))
+        for (auto const& [i, block] : std::views::enumerate(data))
         {
-            workers.push_back(std::thread{ [dummy = ACC(0)](DUMMY_DATA& block) mutable { dummy_proccess_multi(block, dummy); }, std::ref(block)});
+            workers.push_back(std::thread{ [dummy = ACC(0)](DUMMY_DATA const& block) mutable { dummy_process_multi(std::span{ block }, dummy); }, std::ref(block)});
         }
         for (auto& worker : workers)
         {
@@ -119,9 +116,9 @@ int main()
 
         auto const start_time{ std::chrono::steady_clock::now() };
 
-        for (auto const [i, block] : std::views::enumerate(data))
+        for (auto const& [i, block] : std::views::enumerate(data))
         {
-            workers.push_back(std::thread{ dummy_proccess_multi, std::ref(block), std::ref(accs[i])});
+            workers.push_back(std::thread{ dummy_process_multi, std::span{ block }, std::ref(accs[i])});
         }
         for (auto& worker : workers)
         {
@@ -142,9 +139,9 @@ int main()
         
         auto const start_time{ std::chrono::steady_clock::now() };
         
-        for (auto const [i, block] : std::views::enumerate(data))
+        for (auto const& [i, block] : std::views::enumerate(data))
         {
-            workers.push_back(std::thread{ dummy_proccess_multi, std::ref(block), std::ref(accs[i].first) });
+            workers.push_back(std::thread{ dummy_process_multi, std::span{ block }, std::ref(accs[i].first) });
         }
         for (auto& worker : workers)
         {
@@ -157,6 +154,20 @@ int main()
         std::cout << "Result: " << std::accumulate(accs.cbegin(), accs.cend(), static_cast<ACC>(0), [](auto const& lhs, auto const& rhs) -> ACC { return lhs + rhs.first; });
         std::puts("");
     }
+    std::puts("=========================");
+}
+
+
+int main(int argc, char const* (argv)[])
+{
+    std::vector<DUMMY_DATA> data{ BLOCKS_DATA_COUNT };
+
+    for (auto& dummy : data)
+    {
+        std::ranges::generate(dummy, [rng = std::minstd_rand{ }]() mutable { return std::byte{ static_cast<unsigned char>(rng() % 256) }; });
+    }
+    
+    process_data_in_one_shot(data);
 
     return EXIT_SUCCESS;
 }
