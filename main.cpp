@@ -16,6 +16,8 @@
 #include <numbers>
 #include <format>
 #include <fstream>
+#include <atomic>
+#include <gsl/gsl>
 
 namespace
 {
@@ -102,9 +104,6 @@ namespace
     };
 }
 
-#define Q
-//#undef Q
-
 namespace
 {
     constexpr std::size_t CHUNKS_COUNT{ 100ull };
@@ -114,13 +113,8 @@ namespace
     static_assert(CHUNK_SIZE % SLAVES_COUNT == 0ull);
 
     using CHUNK = std::vector<Job>;
-#ifdef Q
     using CHUNK_VIEW = std::span<Job const>;
     using SLAVE_TASK = CHUNK_VIEW::const_iterator;
-#endif // Q
-#ifndef Q
-    using SLAVE_JOB = std::span<Job const>;
-#endif // !Q
     using DUMMY_DATA = std::array<CHUNK, CHUNKS_COUNT>;
 
     struct Statistic
@@ -131,7 +125,6 @@ namespace
     };
 }
 
-#ifdef Q
 namespace
 {
     class Master
@@ -156,20 +149,20 @@ namespace
         {
             cv.wait(lock, [this] { return slaves_finished_job_count == SLAVES_COUNT; });
             slaves_finished_job_count = 0ull;
-            assert(cur_task == cur_workload.cend());
+            assert(cur_task >= cur_workload.size());
         }
 
         void add_workload(CHUNK_VIEW new_workload)
         {
             cur_workload = new_workload;
-            cur_task = cur_workload.cbegin();
+            cur_task = 0;
         }
 
         std::optional<SLAVE_TASK> get_task()
         {
-            std::lock_guard lock{ mtx };
-            if (cur_task == cur_workload.cend()) return std::nullopt;
-            return std::exchange(cur_task, cur_task + 1);
+            auto const old_task{ cur_task++ };
+            if (old_task >= cur_workload.size()) return std::nullopt;
+            return cur_workload.cbegin() + old_task;
         }
 
     private:
@@ -179,7 +172,7 @@ namespace
         std::unique_lock<std::mutex> lock{ mtx };
 
         CHUNK_VIEW cur_workload{ };
-        SLAVE_TASK cur_task{ };
+        std::atomic<gsl::index> cur_task{ };
 
         std::size_t slaves_finished_job_count{ 0ull };
     };
@@ -280,7 +273,7 @@ namespace
     };
 }
 
-static std::vector<Statistic> do_multithread_without_padding(DUMMY_DATA const& data) noexcept
+static std::vector<Statistic> do_multithread(DUMMY_DATA const& data) noexcept
 {
     Master control_block{ };
     std::vector<Slave> slaves{ }; // remove smart ptr
@@ -320,181 +313,6 @@ static std::vector<Statistic> do_multithread_without_padding(DUMMY_DATA const& d
 
     return results;
 }
-#endif // Q
-#ifndef Q
-
-class Master
-{
-public:
-
-    void job_is_done()
-    {
-        bool notification_needed{ false };
-        {
-            std::lock_guard lock{ mtx };
-            ++slaves_finished_job_count;
-            notification_needed = slaves_finished_job_count == SLAVES_COUNT;
-        }
-        if (notification_needed)
-        {
-            cv.notify_one();
-        }
-    }
-
-    void wait_for_slaves()
-    {
-        cv.wait(lock, [this] { return slaves_finished_job_count == SLAVES_COUNT; });
-        slaves_finished_job_count = 0ull;
-    }
-
-private:
-
-    std::condition_variable cv{ };
-    std::mutex mtx{ };
-    std::unique_lock<std::mutex> lock{ mtx };
-
-    std::size_t slaves_finished_job_count{ 0ull };
-};
-
-class Slave
-{
-public:
-
-    Slave(Master& control_block_init)
-        :
-        control_block{ control_block_init },
-        process{ &Slave::run, this }
-    {
-    }
-
-    Slave(Slave&& slave_tmp) noexcept
-        :
-        Slave{ slave_tmp.control_block }
-    {
-    }
-
-    ~Slave()
-    {
-        kill();
-    }
-
-    void set_job(SLAVE_JOB data_to_process)
-    {
-        std::ignore = std::lock_guard{ mtx }, data = data_to_process, dying = false;
-        cv.notify_one();
-    }
-
-    void kill()
-    {
-        std::ignore = std::lock_guard{ mtx }, dying = true;
-        cv.notify_one();
-    }
-
-    Task::DUMMY_OUTPUT get_result() const
-    {
-        return output;
-    }
-
-    long long get_work_time_elapsed() const
-    {
-        return work_time_elapsed;
-    }
-
-    std::size_t get_heavy_jobs_count() const
-    {
-        return heavy_jobs_count;
-    }
-
-private:
-
-    void run()
-    {
-        std::unique_lock lock{ mtx };
-
-        while (true)
-        {
-            cv.wait(lock, [this] { return !data.empty() || dying; });
-
-            if (dying) break;
-
-            heavy_jobs_count = 0ll;
-            output = Task::DUMMY_OUTPUT{ 0 };
-            auto const start_time_data{ std::chrono::steady_clock::now() };
-            for (auto const& dummy_process : data)
-            {
-                output += dummy_process.task->do_stuff();
-            }
-            auto const end_time_data{ std::chrono::steady_clock::now() };
-            for (auto const& dummy_process : data)
-            {
-                if (typeid(*dummy_process.task.get()) == typeid(HeavyJob const&)) ++heavy_jobs_count;
-            }
-            work_time_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end_time_data - start_time_data).count();
-
-            data = {};
-            control_block.job_is_done();
-        }
-    }
-
-private:
-
-    std::condition_variable cv{ };
-    std::mutex mtx{ };
-
-    std::jthread process;
-
-    Master& control_block;
-    SLAVE_JOB data{ };
-    Task::DUMMY_OUTPUT output{ };
-    bool dying{ false };
-    long long work_time_elapsed{ };
-    std::size_t heavy_jobs_count{ };
-};
-
-static std::vector<Statistic> do_multithread_without_padding(DUMMY_DATA const& data) noexcept
-{
-    Master control_block{ };
-    std::vector<Slave> slaves{ };
-    std::generate_n(std::back_inserter(slaves), SLAVES_COUNT, [&control_block] { return Slave{ control_block }; });
-
-    std::vector<Statistic> results{ };
-    results.reserve(CHUNKS_COUNT);
-
-    Task::DUMMY_OUTPUT result{ 0ULL };
-    long long total_time{ 0LL };
-    for (auto const& chunk : data)
-    {
-        constexpr auto SLAVE_LOADOUT{ CHUNK_SIZE / SLAVES_COUNT };
-        if (chunk.size() < SLAVE_LOADOUT) continue;
-
-        auto const start_time_chunk{ std::chrono::steady_clock::now() };
-        for (auto const& [j, slave] : std::views::enumerate(slaves))
-        {
-            slave.set_job(SLAVE_JOB{ chunk.begin() + j * SLAVE_LOADOUT, SLAVE_LOADOUT });
-        }
-        control_block.wait_for_slaves();
-        for (auto const& slave : slaves)
-        {
-            result += slave.get_result();
-        }
-        auto const end_time_chunk{ std::chrono::steady_clock::now() };
-
-        results.emplace_back();
-        for (auto const& [j, slave] : std::views::enumerate(slaves))
-        {
-            results.back().timing_per_thread[j] = slave.get_work_time_elapsed();
-            results.back().number_of_heavy_jobs_per_thread[j] = slave.get_heavy_jobs_count();
-        }
-        auto const chunk_time{ std::chrono::duration_cast<std::chrono::milliseconds>(end_time_chunk - start_time_chunk).count() };
-        total_time += chunk_time;
-        results.back().total_timing = chunk_time;
-    }
-    std::cout << "Result: " << result << " | Done in " << total_time << "ms - multithread\n";
-
-    return results;
-}
-#endif // !Q
-
 
 static void do_singlethread(DUMMY_DATA const& data) noexcept
 {
@@ -577,7 +395,7 @@ int main(int argc, char const* argv[])
 
     do_singlethread(data);
     std::puts("======================================");
-    auto const r{ do_multithread_without_padding(data) };
+    auto const r{ do_multithread(data) };
 
     std::ofstream csv{ "timings.csv" };
     for (std::size_t i{ 0ULL }; i < SLAVES_COUNT; ++i)
