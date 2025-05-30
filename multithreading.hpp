@@ -1,20 +1,17 @@
-#ifndef MULTITHREADING_QUEUE
-#define MULTITHREADING_QUEUE
+#ifndef MULTITHREADING_HPP
 
 #include "Job.hpp"
 #include "StatisticChunk.hpp"
 
 #include <mutex>
 #include <cassert>
-#include <gsl/gsl>
 
 namespace config
 {
-    using CHUNK_VIEW = std::span<Job const>;
-    using SLAVE_TASK = CHUNK_VIEW::const_iterator;
+    using SLAVE_JOB = std::span<Job const>;
 }
 
-namespace multithreading::queue
+namespace multithreading
 {
     class Master
     {
@@ -38,20 +35,6 @@ namespace multithreading::queue
         {
             cv.wait(lock, [this] { return slaves_finished_job_count == config::SLAVES_COUNT; });
             slaves_finished_job_count = 0ull;
-            assert(cur_task >= cur_workload.size());
-        }
-
-        void add_workload(config::CHUNK_VIEW new_workload)
-        {
-            cur_workload = new_workload;
-            cur_task = 0;
-        }
-
-        std::optional<config::SLAVE_TASK> get_task()
-        {
-            auto const old_task{ cur_task++ };
-            if (old_task >= cur_workload.size()) return std::nullopt;
-            return cur_workload.cbegin() + old_task;
         }
 
     private:
@@ -59,9 +42,6 @@ namespace multithreading::queue
         std::condition_variable cv{ };
         std::mutex mtx{ };
         std::unique_lock<std::mutex> lock{ mtx };
-
-        config::CHUNK_VIEW cur_workload{ };
-        std::atomic<gsl::index> cur_task{ };
 
         std::size_t slaves_finished_job_count{ 0ull };
     };
@@ -88,9 +68,9 @@ namespace multithreading::queue
             kill();
         }
 
-        void chunk_load()
+        void set_job(config::SLAVE_JOB data_to_process)
         {
-            chunk_loaded = true;
+            std::ignore = std::lock_guard{ mtx }, data = data_to_process, dying = false;
             cv.notify_one();
         }
 
@@ -123,24 +103,25 @@ namespace multithreading::queue
 
             while (true)
             {
-                cv.wait(lock, [this] { return chunk_loaded || dying; });
+                cv.wait(lock, [this] { return !data.empty() || dying; });
 
                 if (dying) break;
 
                 heavy_jobs_count = 0ll;
                 output = Task::DUMMY_OUTPUT{ 0 };
-                work_time_elapsed = 0;
-                for (auto cur_task{ control_block.get_task() }; cur_task.has_value(); cur_task = control_block.get_task())
+                auto const start_time_data{ std::chrono::steady_clock::now() };
+                for (auto const& dummy_process : data)
                 {
-                    auto const start_time_data{ std::chrono::steady_clock::now() };
-                    output += cur_task.value()->task->do_stuff();
-                    auto const end_time_data{ std::chrono::steady_clock::now() };
-                    work_time_elapsed += std::chrono::duration_cast<std::chrono::milliseconds>(end_time_data - start_time_data).count();
-
-                    if (typeid(*(cur_task.value()->task.get())) == typeid(HeavyTask const&)) ++heavy_jobs_count;
+                    output += dummy_process.task->do_stuff();
                 }
+                auto const end_time_data{ std::chrono::steady_clock::now() };
+                for (auto const& dummy_process : data)
+                {
+                    if (typeid(*dummy_process.task.get()) == typeid(HeavyTask const&)) ++heavy_jobs_count;
+                }
+                work_time_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end_time_data - start_time_data).count();
 
-                chunk_loaded = false;
+                data = {};
                 control_block.job_is_done();
             }
         }
@@ -153,11 +134,9 @@ namespace multithreading::queue
         std::jthread process;
 
         Master& control_block;
+        config::SLAVE_JOB data{ };
         Task::DUMMY_OUTPUT output{ };
-
         bool dying{ false };
-        bool chunk_loaded{ false };
-
         long long work_time_elapsed{ };
         std::size_t heavy_jobs_count{ };
     };
@@ -165,4 +144,4 @@ namespace multithreading::queue
     std::vector<StatisticChunk> do_experiment(config::DUMMY_DATA const& data);
 }
 
-#endif // !MULTITHREADING_QUEUE
+#endif // !MULTITHREADING_HPP

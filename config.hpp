@@ -15,8 +15,6 @@ namespace config
     static_assert(CHUNK_SIZE% SLAVES_COUNT == 0ull);
 
     using CHUNK = std::vector<Job>;
-    using CHUNK_VIEW = std::span<Job const>;
-    using SLAVE_TASK = CHUNK_VIEW::const_iterator;
     using DUMMY_DATA = std::array<CHUNK, CHUNKS_COUNT>;
 }
 #endif // !CONFIG_HPP

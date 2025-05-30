@@ -3,7 +3,7 @@
 #include <iostream>
 #include <ranges>
 
-namespace singlethread
+namespace singlethreading
 {
     void do_experiment(config::DUMMY_DATA const& data);
 }

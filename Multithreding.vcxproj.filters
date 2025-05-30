@@ -27,7 +27,13 @@
     <ClCompile Include="StatisticChunk.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
-    <ClCompile Include="singlethread.cpp">
+    <ClCompile Include="singlethreading.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="multithreading.hpp">
+      <Filter>Файлы заголовков</Filter>
+    </ClCompile>
+    <ClCompile Include="multithreading.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
   </ItemGroup>
@@ -56,7 +62,7 @@
     <ClInclude Include="multithreading_queue.hpp">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="singlethread.hpp">
+    <ClInclude Include="singlethreading.hpp">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
   </ItemGroup>
