@@ -5,7 +5,7 @@
 
 namespace data_generation
 {
-    config::DUMMY_DATA get_evenly();
+    config::DUMMY_DATA get_evened();
     config::DUMMY_DATA get_stacked();
 }
 

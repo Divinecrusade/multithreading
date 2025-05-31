@@ -3,6 +3,22 @@
   "Id": "4517d87c-bc54-4fe8-8916-b89af335027d",
   "Items": [
     {
+      "Id": "e5b6baa8-194d-4db6-96ef-82270f59d8d2",
+      "Command": "--evened"
+    },
+    {
+      "Id": "b062a246-a0cb-46a1-b2c0-39954a127578",
+      "Command": "--multithreading"
+    },
+    {
+      "Id": "f9191093-9959-4a81-9506-8150b21a28ef",
+      "Command": "--singlethreading"
+    },
+    {
+      "Id": "e9a1067a-d6c4-4931-afa6-6629e746f9e1",
+      "Command": "--multithreading-queue"
+    },
+    {
       "Id": "c20a61ae-75ff-44c1-ae77-d40538846467",
       "Command": "--stacked"
     }

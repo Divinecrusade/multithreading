@@ -10,6 +10,8 @@
 
 void StatisticChunk::save_as_csv(std::span<StatisticChunk const> stats, std::filesystem::path uri)
 {
+    static std::filesystem::path const CSV_EXTENSION_NAME{ "csv" };
+    uri.replace_extension(CSV_EXTENSION_NAME);
     std::ofstream csv{ uri };
     for (std::size_t i{ 0ULL }; i < config::SLAVES_COUNT; ++i)
     {

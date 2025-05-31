@@ -130,6 +130,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="cmd_args.hpp" />
     <ClCompile Include="data_generation.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="multithreading.cpp" />

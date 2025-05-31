@@ -2,7 +2,7 @@
 
 namespace data_generation
 {
-    config::DUMMY_DATA get_evenly()
+    config::DUMMY_DATA get_evened()
     {
         config::DUMMY_DATA dataset{ };
         for (auto& chunk : dataset)
@@ -26,7 +26,7 @@ namespace data_generation
 
     config::DUMMY_DATA get_stacked()
     {
-        config::DUMMY_DATA dataset{ get_evenly() };
+        config::DUMMY_DATA dataset{ get_evened() };
         for (auto& chunk : dataset)
         {
             std::ranges::partition(chunk, [](auto const& dummy_process) { return typeid(*dummy_process.task.get()) == typeid(HeavyTask const&); });

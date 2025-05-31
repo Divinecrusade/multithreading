@@ -3,49 +3,53 @@
 #include "data_generation.hpp"
 #include "singlethreading.hpp"
 #include "multithreading.hpp"
+#include "cmd_args.hpp"
+
+#include "argparse/argparse.hpp"
 
 int main(int argc, char const* argv[])
 {
-    using namespace std::string_literals;
-    auto const dataset
-    { 
-        [&]
-        {
-            if (argc > 1)
-            {
-                if (argv[1ULL] == "--stacked"s)
-                {
-                    return data_generation::get_stacked();
-                }
-                else if (argv[1ULL] == "--evenly"s)
-                {
-                    return data_generation::get_evenly();
-                }
-                else
-                {
-                    return config::DUMMY_DATA{ };
-                }
+    argparse::ArgumentParser program{ };
+    std::apply(
+        [&program](auto const&... option) {
+            (..., program.add_argument(option).default_value(false).implicit_value(true));
+        },
+        cmd_args::OPTIONS
+    );
+    program.parse_args(argc, argv);
+
+    auto const process_dataset{
+        [&](auto const& dataset, std::string const& filename_suffix){
+            static std::string const BASE_FILENAME{ "timings" };
+            static std::string const FILENAME_SEPARATOR{ "_" };
+
+            using namespace std::string_literals;
+
+            if (program[cmd_args::USE_SINGLETHREADING] == true) {
+                std::clog << "Singlethreading starts...\n";
+                singlethreading::do_experiment(dataset);
             }
-            else
-            {
-                return config::DUMMY_DATA{ };
+            if (program[cmd_args::USE_MULTITHREADING] == true) {
+                std::clog << "Multithreading starts...\n";
+                auto const stats{ multithreading::do_experiment(dataset) };
+                StatisticChunk::save_as_csv(stats, BASE_FILENAME + FILENAME_SEPARATOR + filename_suffix + FILENAME_SEPARATOR + "nq"s);
+            }
+            if (program[cmd_args::USE_MULTITHREADING_QUEUE] == true) {
+                std::clog << "Multithreading queue starts...\n";
+                auto const stats{ multithreading::queue::do_experiment(dataset) };
+                StatisticChunk::save_as_csv(stats, BASE_FILENAME + FILENAME_SEPARATOR + filename_suffix + FILENAME_SEPARATOR + "q"s);
             }
         }
-        ()
     };
 
-    singlethreading::do_experiment(dataset);
-    std::puts("======================================");
-    auto result {
-        multithreading::queue::do_experiment(dataset)
-    };
-
-    //StatisticChunk::save_as_csv(
-    //    result, 
-    //    "timings.csv"
-    //);
-
-    result = multithreading::do_experiment(dataset);
+    if (program[cmd_args::GENERATE_EVENED_DATASET] == true) {
+        std::clog << "Proccessing evened dataset...\n";
+        process_dataset(data_generation::get_evened(), "evened");
+    }
+    if (program[cmd_args::GENERATE_STACKED_DATASET] == true) {
+        std::clog << "Proccessing stacked dataset...\n";
+        process_dataset(data_generation::get_stacked(), "stacked");
+    }
 
     return EXIT_SUCCESS;
 }
