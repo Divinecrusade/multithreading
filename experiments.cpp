@@ -118,12 +118,25 @@ experiments::multithread::process_data_with_queue(config::DUMMY_DATA const& data
 
 void experiments::multithread::test_pool_generic() {
   using namespace multithreading::pool::generic;
+  using namespace std::chrono_literals;
 
   Master task_manager{};
+  auto const get_thread_id{[] {
+    auto const thread_id{std::this_thread::get_id()};
+    std::this_thread::sleep_for(500ms);
+    std::clog << std::format("<< {} >>", thread_id);
+  }};
 
-  task_manager.Run([] { std::cout << "He"; });
-  task_manager.Run([] { std::cout << "ll"; });
-  task_manager.Run([] { std::cout << "o "; });
-  task_manager.Run([] { std::cout << "wo"; });
-  task_manager.Run([] { std::cout << "rld"; });
+  task_manager.Run(get_thread_id);
+  task_manager.Run(get_thread_id);
+  task_manager.Run(get_thread_id);
+  task_manager.Run(get_thread_id);
+  task_manager.Run(get_thread_id);
+  std::this_thread::sleep_for(1s);
+  std::clog << "\n";
+  task_manager.Run(get_thread_id);
+  task_manager.Run(get_thread_id);
+  task_manager.Run(get_thread_id);
+  task_manager.Run(get_thread_id);
+  task_manager.Run(get_thread_id);
 }
