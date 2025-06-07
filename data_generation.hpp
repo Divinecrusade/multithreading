@@ -3,11 +3,9 @@
 
 #include "config.hpp"
 
-namespace data_generation
-{
-    config::DUMMY_DATA get_evened();
-    config::DUMMY_DATA get_stacked();
-}
+namespace data_generation {
+config::DUMMY_DATA get_evened();
+config::DUMMY_DATA get_stacked();
+}  // namespace data_generation
 
-
-#endif // !DATA_GENERATION_HPP
+#endif  // !DATA_GENERATION_HPP

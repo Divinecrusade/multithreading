@@ -4,164 +4,132 @@
 #include "Job.hpp"
 #include "StatisticChunk.hpp"
 
-#include <mutex>
 #include <cassert>
 #include <gsl/gsl>
+#include <mutex>
 
-namespace config
-{
-    using CHUNK_VIEW = std::span<Job const>;
-    using SLAVE_TASK = CHUNK_VIEW::const_iterator;
-}
+namespace config {
+using CHUNK_VIEW = std::span<Job const>;
+using SLAVE_TASK = CHUNK_VIEW::const_iterator;
+}  // namespace config
 
-namespace multithreading::queue
-{
-    class Master
+namespace multithreading::queue {
+class Master {
+ public:
+  void job_is_done() {
+    bool notification_needed{false};
     {
-    public:
+      std::lock_guard lock{mtx};
+      ++slaves_finished_job_count;
+      notification_needed = slaves_finished_job_count == config::SLAVES_COUNT;
+    }
+    if (notification_needed) {
+      cv.notify_one();
+    }
+  }
 
-        void job_is_done()
-        {
-            bool notification_needed{ false };
-            {
-                std::lock_guard lock{ mtx };
-                ++slaves_finished_job_count;
-                notification_needed = slaves_finished_job_count == config::SLAVES_COUNT;
-            }
-            if (notification_needed)
-            {
-                cv.notify_one();
-            }
-        }
+  void wait_for_slaves() {
+    cv.wait(lock, [this] {
+      return slaves_finished_job_count == config::SLAVES_COUNT;
+    });
+    slaves_finished_job_count = 0ull;
+    assert(cur_task >= cur_workload.size());
+  }
 
-        void wait_for_slaves()
-        {
-            cv.wait(lock, [this] { return slaves_finished_job_count == config::SLAVES_COUNT; });
-            slaves_finished_job_count = 0ull;
-            assert(cur_task >= cur_workload.size());
-        }
+  void add_workload(config::CHUNK_VIEW new_workload) {
+    cur_workload = new_workload;
+    cur_task = 0;
+  }
 
-        void add_workload(config::CHUNK_VIEW new_workload)
-        {
-            cur_workload = new_workload;
-            cur_task = 0;
-        }
+  std::optional<config::SLAVE_TASK> get_task() {
+    auto const old_task{cur_task++};
+    if (old_task >= cur_workload.size()) return std::nullopt;
+    return cur_workload.cbegin() + old_task;
+  }
 
-        std::optional<config::SLAVE_TASK> get_task()
-        {
-            auto const old_task{ cur_task++ };
-            if (old_task >= cur_workload.size()) return std::nullopt;
-            return cur_workload.cbegin() + old_task;
-        }
+ private:
+  std::condition_variable cv{};
+  std::mutex mtx{};
+  std::unique_lock<std::mutex> lock{mtx};
 
-    private:
+  config::CHUNK_VIEW cur_workload{};
+  std::atomic<gsl::index> cur_task{};
 
-        std::condition_variable cv{ };
-        std::mutex mtx{ };
-        std::unique_lock<std::mutex> lock{ mtx };
+  std::size_t slaves_finished_job_count{0ull};
+};
 
-        config::CHUNK_VIEW cur_workload{ };
-        std::atomic<gsl::index> cur_task{ };
+class Slave {
+ public:
+  Slave(Master& control_block_init)
+      : control_block{control_block_init}, process{&Slave::run, this} {}
 
-        std::size_t slaves_finished_job_count{ 0ull };
-    };
+  Slave(Slave&& slave_tmp) noexcept : Slave{slave_tmp.control_block} {}
 
-    class Slave
-    {
-    public:
+  ~Slave() { kill(); }
 
-        Slave(Master& control_block_init)
-            :
-            control_block{ control_block_init },
-            process{ &Slave::run, this }
-        {
-        }
+  void chunk_load() {
+    chunk_loaded = true;
+    cv.notify_one();
+  }
 
-        Slave(Slave&& slave_tmp) noexcept
-            :
-            Slave{ slave_tmp.control_block }
-        {
-        }
+  void kill() {
+    std::ignore = std::lock_guard{mtx}, dying = true;
+    cv.notify_one();
+  }
 
-        ~Slave()
-        {
-            kill();
-        }
+  Task::DUMMY_OUTPUT get_result() const { return output; }
 
-        void chunk_load()
-        {
-            chunk_loaded = true;
-            cv.notify_one();
-        }
+  long long get_work_time_elapsed() const { return work_time_elapsed; }
 
-        void kill()
-        {
-            std::ignore = std::lock_guard{ mtx }, dying = true;
-            cv.notify_one();
-        }
+  std::size_t get_heavy_jobs_count() const { return heavy_jobs_count; }
 
-        Task::DUMMY_OUTPUT get_result() const
-        {
-            return output;
-        }
+ private:
+  void run() {
+    std::unique_lock lock{mtx};
 
-        long long get_work_time_elapsed() const
-        {
-            return work_time_elapsed;
-        }
+    while (true) {
+      cv.wait(lock, [this] { return chunk_loaded || dying; });
 
-        std::size_t get_heavy_jobs_count() const
-        {
-            return heavy_jobs_count;
-        }
+      if (dying) break;
 
-    private:
+      heavy_jobs_count = 0ll;
+      output = Task::DUMMY_OUTPUT{0};
+      work_time_elapsed = 0;
+      for (auto cur_task{control_block.get_task()}; cur_task.has_value();
+           cur_task = control_block.get_task()) {
+        auto const start_time_data{std::chrono::steady_clock::now()};
+        output += cur_task.value()->task->do_stuff();
+        auto const end_time_data{std::chrono::steady_clock::now()};
+        work_time_elapsed +=
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                end_time_data - start_time_data)
+                .count();
 
-        void run()
-        {
-            std::unique_lock lock{ mtx };
+        if (typeid(*(cur_task.value()->task.get())) == typeid(HeavyTask const&))
+          ++heavy_jobs_count;
+      }
 
-            while (true)
-            {
-                cv.wait(lock, [this] { return chunk_loaded || dying; });
+      chunk_loaded = false;
+      control_block.job_is_done();
+    }
+  }
 
-                if (dying) break;
+ private:
+  std::condition_variable cv{};
+  std::mutex mtx{};
 
-                heavy_jobs_count = 0ll;
-                output = Task::DUMMY_OUTPUT{ 0 };
-                work_time_elapsed = 0;
-                for (auto cur_task{ control_block.get_task() }; cur_task.has_value(); cur_task = control_block.get_task())
-                {
-                    auto const start_time_data{ std::chrono::steady_clock::now() };
-                    output += cur_task.value()->task->do_stuff();
-                    auto const end_time_data{ std::chrono::steady_clock::now() };
-                    work_time_elapsed += std::chrono::duration_cast<std::chrono::milliseconds>(end_time_data - start_time_data).count();
+  std::jthread process;
 
-                    if (typeid(*(cur_task.value()->task.get())) == typeid(HeavyTask const&)) ++heavy_jobs_count;
-                }
+  Master& control_block;
+  Task::DUMMY_OUTPUT output{};
 
-                chunk_loaded = false;
-                control_block.job_is_done();
-            }
-        }
+  bool dying{false};
+  bool chunk_loaded{false};
 
-    private:
+  long long work_time_elapsed{};
+  std::size_t heavy_jobs_count{};
+};
 
-        std::condition_variable cv{ };
-        std::mutex mtx{ };
+}  // namespace multithreading::queue
 
-        std::jthread process;
-
-        Master& control_block;
-        Task::DUMMY_OUTPUT output{ };
-
-        bool dying{ false };
-        bool chunk_loaded{ false };
-
-        long long work_time_elapsed{ };
-        std::size_t heavy_jobs_count{ };
-    };
-
-}
-
-#endif // !MULTITHREADING_QUEUE
+#endif  // !MULTITHREADING_QUEUE

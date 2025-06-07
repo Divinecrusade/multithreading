@@ -1,15 +1,15 @@
 #ifndef MULTITHREADING_POOL_GENERIC_HPP
 #define MULTITHREADING_POOL_GENERIC_HPP
 
-#include <functional>
-#include <condition_variable>
-#include <thread>
-#include <optional>
-#include <cassert>
-#include <utility>
 #include <algorithm>
-#include <vector>
+#include <cassert>
+#include <condition_variable>
+#include <functional>
 #include <memory>
+#include <optional>
+#include <thread>
+#include <utility>
+#include <vector>
 
 namespace multithreading::pool::generic {
 
@@ -17,15 +17,16 @@ using Task = std::function<void()>;
 
 class Slave {
  public:
+  [[nodiscard]] bool IsRunning() const noexcept {
+    return cur_task_.has_value();
+  }
 
-  [[nodiscard]] bool IsRunning() const noexcept { return cur_task_.has_value(); }
-  void SetTask(Task new_task) noexcept { 
+  void SetTask(Task new_task) noexcept {
     assert(!IsRunning());
     cur_task_ = std::move(new_task);
   }
 
  private:
-
   void KernelRoutine() {
     std::unique_lock lck{mtx_};
     auto const stop_tkn{cur_thread_.get_stop_token()};
@@ -37,7 +38,6 @@ class Slave {
   }
 
  private:
-
   std::mutex mtx_{};
   std::condition_variable_any cv_{};
   std::optional<Task> cur_task_{};
@@ -46,12 +46,9 @@ class Slave {
 
 class Master {
  public:
-  
-  void Run(Task task) noexcept { 
+  void Run(Task task) noexcept {
     if (auto const free_slave{std::ranges::find_if(
-            slaves_, [](auto const& slave) { 
-          return !slave->IsRunning();
-        })};
+            slaves_, [](auto const& slave) { return !slave->IsRunning(); })};
         free_slave != slaves_.end()) {
       (*free_slave)->SetTask(std::move(task));
     } else {
@@ -61,9 +58,8 @@ class Master {
   }
 
  private:
-
   std::vector<std::unique_ptr<Slave>> slaves_{};
 };
-}
+}  // namespace multithreading::pool::generic
 
-#endif // !MULTITHREADING_GENERIC_POOL_HPP
+#endif  // !MULTITHREADING_GENERIC_POOL_HPP
