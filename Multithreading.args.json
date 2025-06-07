@@ -3,6 +3,10 @@
   "Id": "4517d87c-bc54-4fe8-8916-b89af335027d",
   "Items": [
     {
+      "Id": "fb058611-fdb6-49d4-8f5e-1bf9c2f24325",
+      "Command": "--multithreading-pool-generic"
+    },
+    {
       "Id": "e5b6baa8-194d-4db6-96ef-82270f59d8d2",
       "Command": "--evened"
     },
