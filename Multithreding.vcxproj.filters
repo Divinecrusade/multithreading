@@ -21,25 +21,16 @@
     <ClCompile Include="data_generation.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
-    <ClCompile Include="multithreading_queue.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
     <ClCompile Include="StatisticChunk.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
-    <ClCompile Include="singlethreading.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
     <ClCompile Include="multithreading.hpp">
       <Filter>Файлы заголовков</Filter>
     </ClCompile>
-    <ClCompile Include="multithreading.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
     <ClCompile Include="cmd_args.hpp">
       <Filter>Файлы заголовков</Filter>
     </ClCompile>
-    <ClCompile Include="multithreading_pool_generic.cpp">
+    <ClCompile Include="experiments.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
   </ItemGroup>
@@ -68,10 +59,10 @@
     <ClInclude Include="multithreading_queue.hpp">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="singlethreading.hpp">
+    <ClInclude Include="multithreading_pool_generic.hpp">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="multithreading_pool_generic.hpp">
+    <ClInclude Include="experiments.hpp">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
   </ItemGroup>

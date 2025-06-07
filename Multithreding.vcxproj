@@ -132,23 +132,20 @@
   <ItemGroup>
     <ClCompile Include="cmd_args.hpp" />
     <ClCompile Include="data_generation.cpp" />
+    <ClCompile Include="experiments.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="multithreading.cpp" />
     <ClCompile Include="multithreading.hpp" />
-    <ClCompile Include="multithreading_pool_generic.cpp" />
-    <ClCompile Include="multithreading_queue.cpp" />
-    <ClCompile Include="singlethreading.cpp" />
     <ClCompile Include="StatisticChunk.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="config.hpp" />
     <ClInclude Include="data_generation.hpp" />
+    <ClInclude Include="experiments.hpp" />
     <ClInclude Include="HeavyTask.hpp" />
     <ClInclude Include="Job.hpp" />
     <ClInclude Include="LightTask.hpp" />
     <ClInclude Include="multithreading_pool_generic.hpp" />
     <ClInclude Include="multithreading_queue.hpp" />
-    <ClInclude Include="singlethreading.hpp" />
     <ClInclude Include="StatisticChunk.hpp" />
     <ClInclude Include="Task.hpp" />
   </ItemGroup>

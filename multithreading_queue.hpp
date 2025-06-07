@@ -162,7 +162,6 @@ namespace multithreading::queue
         std::size_t heavy_jobs_count{ };
     };
 
-    std::vector<StatisticChunk> do_experiment(config::DUMMY_DATA const& data);
 }
 
 #endif // !MULTITHREADING_QUEUE

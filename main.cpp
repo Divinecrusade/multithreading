@@ -1,10 +1,10 @@
 #include "config.hpp"
 #include "multithreading_queue.hpp"
 #include "data_generation.hpp"
-#include "singlethreading.hpp"
 #include "multithreading.hpp"
 #include "multithreading_pool_generic.hpp"
 #include "cmd_args.hpp"
+#include "experiments.hpp"
 
 #include "argparse/argparse.hpp"
 
@@ -28,16 +28,16 @@ int main(int argc, char const* argv[])
 
             if (program[cmd_args::USE_SINGLETHREADING] == true) {
                 std::clog << "Singlethreading starts...\n";
-                singlethreading::do_experiment(dataset);
+                experiments::singlethread::process_data(dataset);
             }
             if (program[cmd_args::USE_MULTITHREADING] == true) {
                 std::clog << "Multithreading starts...\n";
-                auto const stats{ multithreading::do_experiment(dataset) };
+                auto const stats{ experiments::multithread::process_data_without_queue(dataset) };
                 StatisticChunk::save_as_csv(stats, BASE_FILENAME + FILENAME_SEPARATOR + filename_suffix + FILENAME_SEPARATOR + "nq"s);
             }
             if (program[cmd_args::USE_MULTITHREADING_QUEUE] == true) {
                 std::clog << "Multithreading queue starts...\n";
-                auto const stats{ multithreading::queue::do_experiment(dataset) };
+                auto const stats{ experiments::multithread::process_data_with_queue(dataset) };
                 StatisticChunk::save_as_csv(stats, BASE_FILENAME + FILENAME_SEPARATOR + filename_suffix + FILENAME_SEPARATOR + "q"s);
             }
         }
@@ -53,7 +53,7 @@ int main(int argc, char const* argv[])
     }
     if (program[cmd_args::USE_MULTITHREADING_POOL_GENERIC] == true) {
       std::clog << "Processing multithreading with generic pool...\n";
-      multithreading::pool::generic::do_experiment();
+      experiments::multithread::test_pool_generic();
     }
     
     return EXIT_SUCCESS;

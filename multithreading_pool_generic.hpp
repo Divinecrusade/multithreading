@@ -64,8 +64,6 @@ class Master {
 
   std::vector<std::unique_ptr<Slave>> slaves_{};
 };
-
-  void do_experiment();
 }
 
 #endif // !MULTITHREADING_GENERIC_POOL_HPP
