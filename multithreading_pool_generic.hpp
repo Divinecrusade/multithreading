@@ -10,55 +10,85 @@
 #include <thread>
 #include <utility>
 #include <vector>
+#include <ranges>
+#include <queue>
 
 namespace multithreading::pool::generic {
 
 using Task = std::function<void()>;
 
-class Slave {
- public:
-  [[nodiscard]] bool IsRunning() const noexcept {
-    return cur_task_.has_value();
-  }
-
-  void SetTask(Task new_task) noexcept {
-    assert(!IsRunning());
-    cur_task_ = std::move(new_task);
-  }
-
- private:
-  void KernelRoutine() {
-    std::unique_lock lck{mtx_};
-    auto const stop_tkn{cur_thread_.get_stop_token()};
-
-    while (cv_.wait(lck, stop_tkn, [this] { return IsRunning(); })) {
-      (*cur_task_)();
-      cur_task_.reset();
-    }
-  }
-
- private:
-  std::mutex mtx_{};
-  std::condition_variable_any cv_{};
-  std::optional<Task> cur_task_{};
-  std::jthread cur_thread_{&Slave::KernelRoutine, this};
-};
-
 class Master {
+ private:
+
+ class Slave {
+  public:
+   Slave(Master& tasks_pool) : tasks_pool_{tasks_pool} { }
+
+   void Kill() noexcept { cur_thread_.request_stop(); }
+
+  private:
+   void KernelRoutine(std::stop_token const& st) const noexcept {
+     while (auto const cur_task{tasks_pool_.GetTask(st)}) {
+       cur_task();
+     }
+   }
+
+  private:
+   Master& tasks_pool_;
+
+   std::jthread cur_thread_{std::bind_front(&Slave::KernelRoutine, this)};
+ };
+
  public:
-  void Run(Task task) noexcept {
-    if (auto const free_slave{std::ranges::find_if(
-            slaves_, [](auto const& slave) { return !slave->IsRunning(); })};
-        free_slave != slaves_.end()) {
-      (*free_slave)->SetTask(std::move(task));
+  Master(std::size_t slaves_count) noexcept {
+    slaves_.reserve(slaves_count);
+    for (auto i : std::views::iota(1ULL, slaves_count)) {
+      slaves_.emplace_back(*this);
+    }
+  }
+
+  ~Master() noexcept {
+    for (auto& slave : slaves_) {
+      slave.Kill();
+    }
+  }
+
+  void Run(Task task) noexcept { 
+    std::ignore = std::lock_guard{queue_mtx_},
+    remaining_tasks_.push(std::move(task));
+
+    queue_cv_.notify_one();
+  }
+
+  void WaitForAll() {
+    std::unique_lock lk{queue_mtx_};
+    wait_cv_.wait(lk, [&tasks = remaining_tasks_]() { return tasks.empty(); });
+  }
+
+ private:
+    Task GetTask(std::stop_token const& st) noexcept {
+    std::unique_lock lk{queue_mtx_};
+    queue_cv_.wait(lk, st,
+      [&tasks = remaining_tasks_]() { return !tasks.empty(); });
+    if (!st.stop_requested()) {
+      auto const cur_task{std::move(remaining_tasks_.front())};
+      remaining_tasks_.pop();
+      if (remaining_tasks_.empty()) {
+        wait_cv_.notify_all();
+      }
+      return cur_task;
     } else {
-      slaves_.emplace_back(std::make_unique<Slave>());
-      slaves_.back()->SetTask(std::move(task));
+      return {};
     }
   }
 
  private:
-  std::vector<std::unique_ptr<Slave>> slaves_{};
+  std::queue<Task> remaining_tasks_{};
+  
+  std::condition_variable wait_cv_{};
+  std::mutex queue_mtx_{};
+  std::condition_variable_any queue_cv_{};
+  std::vector<Slave> slaves_{};
 };
 }  // namespace multithreading::pool::generic
 

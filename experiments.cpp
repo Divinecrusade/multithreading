@@ -120,23 +120,24 @@ void experiments::multithread::test_pool_generic() {
   using namespace multithreading::pool::generic;
   using namespace std::chrono_literals;
 
-  Master task_manager{};
+  //Master task_manager{std::thread::hardware_concurrency() * 2};
+  Master task_manager{4};
   auto const get_thread_id{[] {
     auto const thread_id{std::this_thread::get_id()};
-    std::this_thread::sleep_for(500ms);
-    std::clog << std::format("<< {} >>", thread_id);
+    std::this_thread::sleep_for(100ms);
+    std::clog << std::format("<< {} >>\n", thread_id) << std::flush;
   }};
 
+  std::this_thread::sleep_for(200ms);
   task_manager.Run(get_thread_id);
   task_manager.Run(get_thread_id);
   task_manager.Run(get_thread_id);
   task_manager.Run(get_thread_id);
   task_manager.Run(get_thread_id);
-  std::this_thread::sleep_for(1s);
-  std::clog << "\n";
   task_manager.Run(get_thread_id);
   task_manager.Run(get_thread_id);
   task_manager.Run(get_thread_id);
   task_manager.Run(get_thread_id);
   task_manager.Run(get_thread_id);
+  task_manager.WaitForAll();
 }
