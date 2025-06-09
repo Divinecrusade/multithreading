@@ -66,20 +66,20 @@ class Master {
   }
 
  private:
-    Task GetTask(std::stop_token const& st) noexcept {
-    std::unique_lock lk{queue_mtx_};
-    queue_cv_.wait(lk, st,
-      [&tasks = remaining_tasks_]() { return !tasks.empty(); });
-    if (!st.stop_requested()) {
-      auto const cur_task{std::move(remaining_tasks_.front())};
-      remaining_tasks_.pop();
-      if (remaining_tasks_.empty()) {
-        wait_cv_.notify_all();
-      }
-      return cur_task;
-    } else {
-      return {};
-    }
+  Task GetTask(std::stop_token const& st) noexcept {
+   std::unique_lock lk{queue_mtx_};
+   queue_cv_.wait(lk, st,
+     [&tasks = remaining_tasks_]() { return !tasks.empty(); });
+   if (!st.stop_requested()) {
+     auto const cur_task{std::move(remaining_tasks_.front())};
+     remaining_tasks_.pop();
+     if (remaining_tasks_.empty()) {
+       wait_cv_.notify_all();
+     }
+     return cur_task;
+   } else {
+     return {};
+   }
   }
 
  private:
