@@ -128,7 +128,12 @@ void experiments::multithread::test_pool_generic() {
     std::clog << std::format("<< {} >>\n", thread_id) << std::flush;
   }};
 
-  std::this_thread::sleep_for(200ms);
+  //std::this_thread::sleep_for(200ms);
+  task_manager.Run(get_thread_id);
+  task_manager.Run(get_thread_id);
+  task_manager.Run(get_thread_id);
+  task_manager.Run(get_thread_id);
+  task_manager.Run(get_thread_id);
   task_manager.Run(get_thread_id);
   task_manager.Run(get_thread_id);
   task_manager.Run(get_thread_id);

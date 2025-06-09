@@ -12,6 +12,7 @@
 #include <vector>
 #include <ranges>
 #include <queue>
+#include <iostream>
 
 namespace multithreading::pool::generic {
 
@@ -19,25 +20,24 @@ using Task = std::function<void()>;
 
 class Master {
  private:
-
- class Slave {
-  public:
-   Slave(Master& tasks_pool) : tasks_pool_{tasks_pool} { }
-
-   void Kill() noexcept { cur_thread_.request_stop(); }
-
-  private:
-   void KernelRoutine(std::stop_token const& st) const noexcept {
-     while (auto const cur_task{tasks_pool_.GetTask(st)}) {
-       cur_task();
-     }
-   }
-
-  private:
-   Master& tasks_pool_;
-
-   std::jthread cur_thread_{std::bind_front(&Slave::KernelRoutine, this)};
- };
+  class Slave {
+   public:
+    Slave(Master& tasks_pool) : tasks_pool_{tasks_pool} { }
+  
+    void Kill() noexcept { cur_thread_.request_stop(); }
+  
+   private:
+    void KernelRoutine(std::stop_token const& st) const noexcept {
+      while (auto const cur_task{tasks_pool_.GetTask(st)}) {
+        cur_task();
+      }
+    }
+  
+   private:
+    Master& tasks_pool_;
+  
+    std::jthread cur_thread_{std::bind_front(&Slave::KernelRoutine, this)};
+  };
 
  public:
   Master(std::size_t slaves_count) noexcept {
@@ -62,28 +62,42 @@ class Master {
 
   void WaitForAll() {
     std::unique_lock lk{queue_mtx_};
-    wait_cv_.wait(lk, [&tasks = remaining_tasks_]() { return tasks.empty(); });
+    wait_cv_.wait(lk, [&tasks = remaining_tasks_,
+                       &running_tasks_count = running_tasks_count_]() {
+      return tasks.empty() && running_tasks_count == 0ULL;
+    });
   }
 
  private:
   Task GetTask(std::stop_token const& st) noexcept {
-   std::unique_lock lk{queue_mtx_};
-   queue_cv_.wait(lk, st,
-     [&tasks = remaining_tasks_]() { return !tasks.empty(); });
-   if (!st.stop_requested()) {
-     auto const cur_task{std::move(remaining_tasks_.front())};
-     remaining_tasks_.pop();
-     if (remaining_tasks_.empty()) {
-       wait_cv_.notify_all();
-     }
-     return cur_task;
-   } else {
-     return {};
-   }
+    std::unique_lock lk{queue_mtx_};
+    queue_cv_.wait(lk, st,
+      [&tasks = remaining_tasks_]() { return !tasks.empty(); });
+    if (!st.stop_requested()) {
+      auto const cur_task_from_pool{
+        [task = std::move(remaining_tasks_.front()), 
+        &counter = running_tasks_count_,
+        &wait_cv = wait_cv_]{
+          ++counter;
+          task();
+          --counter;
+          if (counter == 0ULL) {
+            wait_cv.notify_all();
+          }
+      }};
+      remaining_tasks_.pop();
+      if (remaining_tasks_.empty()) {
+        wait_cv_.notify_all();
+      }
+      return cur_task_from_pool;
+    } else {
+      return {};
+    }
   }
 
  private:
   std::queue<Task> remaining_tasks_{};
+  std::atomic<std::size_t> running_tasks_count_{0ULL};
   
   std::condition_variable wait_cv_{};
   std::mutex queue_mtx_{};
