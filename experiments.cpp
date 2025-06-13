@@ -2,6 +2,7 @@
 #include "multithreading.hpp"
 #include "multithreading_queue.hpp"
 #include "multithreading_pool_generic.hpp"
+#include "Promise.hpp"
 
 #include <ranges>
 #include <iostream>
@@ -118,26 +119,34 @@ experiments::multithread::process_data_with_queue(config::DUMMY_DATA const& data
 
 void experiments::multithread::test_pool_generic() {
   using namespace multithreading::pool::generic;
+  using namespace multithreading::futurama;
   using namespace std::chrono_literals;
 
   //Master task_manager{std::thread::hardware_concurrency() * 2};
-  Master task_manager{4};
-  auto const get_thread_id{[] {
-    auto const thread_id{std::this_thread::get_id()};
-    std::this_thread::sleep_for(100ms);
-    std::clog << std::format("<< {} >>\n", thread_id) << std::flush;
-  }};
+  //auto const get_thread_id{[] {
+  //  auto const thread_id{std::this_thread::get_id()};
+  //  std::this_thread::sleep_for(100ms);
+  //  std::clog << std::format("<< {} >>\n", thread_id) << std::flush;
+  //}};
 
-  std::this_thread::sleep_for(200ms);
-  task_manager.Run(get_thread_id);
-  task_manager.Run(get_thread_id);
-  task_manager.Run(get_thread_id);
-  task_manager.Run(get_thread_id);
-  task_manager.Run(get_thread_id);
-  task_manager.Run(get_thread_id);
-  task_manager.Run(get_thread_id);
-  task_manager.Run(get_thread_id);
-  task_manager.Run(get_thread_id);
-  task_manager.Run(get_thread_id);
-  task_manager.WaitForAll();
+  //std::this_thread::sleep_for(200ms);
+  //task_manager.Run(get_thread_id);
+  //task_manager.Run(get_thread_id);
+  //task_manager.Run(get_thread_id);
+  //task_manager.Run(get_thread_id);
+  //task_manager.Run(get_thread_id);
+  //task_manager.Run(get_thread_id);
+  //task_manager.Run(get_thread_id);
+  //task_manager.Run(get_thread_id);
+  //task_manager.Run(get_thread_id);
+  //task_manager.Run(get_thread_id);
+  //task_manager.WaitForAll();
+  
+  Promise<int> ticket{};
+  auto fut{ticket.GetFuture()};
+  std::thread{ [](Promise<int> state){
+    std::this_thread::sleep_for(3s);
+    state.SetResult(69);
+  }, std::move(ticket) }.detach();
+  std::clog << fut.GetResult();
 }
