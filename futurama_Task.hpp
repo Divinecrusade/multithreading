@@ -33,7 +33,16 @@ class Task {
     promise = std::forward<P>(promise),
     ...params = std::forward<Args>(params)
   ]() mutable {
-    promise.SetResult(functor(params...));
+    try {
+      if constexpr (std::is_void_v<std::invoke_result_t<F, Args...>>) {
+        functor(std::forward<Args>(params)...);
+        promise.SetResult();
+      } else {
+        promise.SetResult(functor(std::forward<Args>(params)...));
+      }
+    } catch(...) {
+      promise.SetResult(std::current_exception());
+    }
   }}
   {}
 

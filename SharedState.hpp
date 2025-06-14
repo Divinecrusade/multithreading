@@ -2,45 +2,54 @@
 #define SHARED_STATE_HPP
 
 #include <optional>
-#include <concepts>
 #include <semaphore>
+#include <variant>
 
 namespace multithreading::futurama {
 template <class T>
 class SharedState {
  public:
   template <class R>
-  requires std::constructible_from<T, R>
   void Set(R&& new_val) noexcept {
-    sem.release();
     val_ = std::forward<R>(new_val);
-    // TODO: compile restrict, val should be initilised only once
+    sem_.release();
   }
 
-  T Get() noexcept {
-    sem.acquire();
-    return std::move(val_.value_or(T{}));
-    // TODO: compile restrict, val should be getted only once
+  T Get() {
+    sem_.acquire();
+    if (auto const e{std::get_if<std::exception_ptr>(&val_)}) {
+      std::rethrow_exception(*e);
+    } else {
+      return std::get<T>(val_);
+    }
   }
 
  private:
-  std::binary_semaphore sem{0};
-  std::optional<T> val_{std::nullopt};
+  std::binary_semaphore sem_{0};
+  std::variant<std::monostate, T, std::exception_ptr> val_{};
 };
 
 template <>
 class SharedState<void> {
  public:
   void Set() noexcept {
-    sem.release();
+    sem_.release();
+  }
+  void Set(std::exception_ptr e) noexcept {
+    e_ = e;
+    sem_.release();
   }
 
-  void Get() noexcept {
-    sem.acquire();
+  void Get() {
+    sem_.acquire();
+    if (e_) {
+      std::rethrow_exception(e_);
+    }
   }
 
  private:
-  std::binary_semaphore sem{0};
+  std::binary_semaphore sem_{0};
+  std::exception_ptr e_{nullptr};
 };
 }  // namespace multithreading::futurama
 

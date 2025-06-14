@@ -124,23 +124,29 @@ void experiments::multithread::test_pool_generic() {
 
   Master task_manager{std::thread::hardware_concurrency() * 2};
   auto const get_thread_id{[](int miliseconds_count) {
+    if (miliseconds_count % 4 == 0) throw std::runtime_error{"test"};
+
     auto const thread_id{std::this_thread::get_id()};
-    std::this_thread::sleep_for(1ms * miliseconds_count);
+    std::this_thread::sleep_for(1ms * (miliseconds_count * 100));
     return std::format("<< {} >>\n", thread_id);
   }};
 
   auto const futures{ 
     std::views::iota(1, 41) |
-    std::views::transform([&](auto const& i) { return task_manager.Run(get_thread_id, 100 * i); }) | 
+    std::views::transform([&](auto const& i) { return task_manager.Run(get_thread_id, i); }) | 
     std::ranges::to<std::vector>()
   };
   for (auto const& futa : futures) {
-    std::cout << futa.GetResult();
+    try {
+      std::cout << futa.GetResult();
+    } catch (...) {
+      std::cerr << "exception from thread\n";
+    }
   }
   
   Promise<int> ticket{};
   auto fut{ticket.GetFuture()};
-  std::thread{ [](Promise<int> state){
+  std::thread{ [](Promise<int> state) {
     std::this_thread::sleep_for(3s);
     state.SetResult(69);
   }, std::move(ticket) }.detach();
