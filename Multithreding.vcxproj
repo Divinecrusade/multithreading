@@ -141,7 +141,6 @@
     <ClInclude Include="config.hpp" />
     <ClInclude Include="data_generation.hpp" />
     <ClInclude Include="experiments.hpp" />
-    <ClInclude Include="futurama_Task.hpp" />
     <ClInclude Include="HeavyTask.hpp" />
     <ClInclude Include="Job.hpp" />
     <ClInclude Include="LightTask.hpp" />

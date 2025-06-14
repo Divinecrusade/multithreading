@@ -1,11 +1,11 @@
 #ifndef MULTITHREADING_POOL_GENERIC_HPP
 #define MULTITHREADING_POOL_GENERIC_HPP
 
-#include "futurama_Task.hpp"
 #include <algorithm>
 #include <cassert>
 #include <condition_variable>
 #include <functional>
+#include <future>
 #include <memory>
 #include <optional>
 #include <queue>
@@ -53,13 +53,20 @@ class Master {
 
   template <class F, typename... Args>
   auto Run(F&& functor, Args&&... params) noexcept {
-    auto [task, future] {multithreading::futurama::Task::make(std::forward<F>(functor), std::forward<Args>(params)...)};
+    using functor_return_t = std::invoke_result_t<F, Args...>;
+    std::packaged_task<functor_return_t(Args...)> pack{functor};
+    auto future{pack.get_future()};
+    auto task{
+      [...params = std::forward<Args>(params), pack = std::move(pack)] mutable {
+        pack(std::move(params)...);
+      }
+    };
     std::ignore = std::lock_guard{queue_mtx_},
     remaining_tasks_.push(std::move(task));
 
     queue_cv_.notify_one();
 
-    return std::move(future);
+    return future;
   }
 
   void WaitForAll() {
@@ -68,7 +75,7 @@ class Master {
   }
 
  private:
-  multithreading::futurama::Task GetTask(std::stop_token const& st) {
+  std::move_only_function<void()> GetTask(std::stop_token const& st) {
     std::unique_lock lk{queue_mtx_};
     queue_cv_.wait(lk, st,
                    [&tasks = remaining_tasks_]() { return !tasks.empty(); });
@@ -85,7 +92,7 @@ class Master {
   }
 
  private:
-  std::queue<multithreading::futurama::Task> remaining_tasks_{};
+  std::queue<std::move_only_function<void()>> remaining_tasks_{};
 
   std::condition_variable wait_cv_{};
   std::mutex queue_mtx_{};

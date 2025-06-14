@@ -2,7 +2,6 @@
 #include "multithreading.hpp"
 #include "multithreading_queue.hpp"
 #include "multithreading_pool_generic.hpp"
-#include "futurama_Task.hpp"
 
 #include <ranges>
 #include <iostream>
@@ -119,7 +118,6 @@ experiments::multithread::process_data_with_queue(config::DUMMY_DATA const& data
 
 void experiments::multithread::test_pool_generic() {
   using namespace multithreading::pool::generic;
-  using namespace multithreading::futurama;
   using namespace std::chrono_literals;
 
   Master task_manager{std::thread::hardware_concurrency() * 2};
@@ -144,11 +142,14 @@ void experiments::multithread::test_pool_generic() {
     }
   }
 
-  auto [task, futa] {multithreading::futurama::Task::make([](int x) { std::this_thread::sleep_for(2s); return x + 40'000; }, 69)};
+  std::packaged_task<int()> task{std::bind([](int x) {
+    std::this_thread::sleep_for(2s);
+    return x + 40'000; }, 69)
+  };
+  auto futa{task.get_future()};
   std::thread{std::move(task)}.detach();
   while (futa.wait_for(400ms) != std::future_status::ready) {
     std::clog << "Waiting...\n";
-    std::this_thread::sleep_for(400ms);
   }
   std::clog << "Result is " << futa.get() << "\n";
 }
