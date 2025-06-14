@@ -122,25 +122,21 @@ void experiments::multithread::test_pool_generic() {
   using namespace multithreading::futurama;
   using namespace std::chrono_literals;
 
-  //Master task_manager{std::thread::hardware_concurrency() * 2};
-  //auto const get_thread_id{[] {
-  //  auto const thread_id{std::this_thread::get_id()};
-  //  std::this_thread::sleep_for(100ms);
-  //  std::clog << std::format("<< {} >>\n", thread_id) << std::flush;
-  //}};
+  Master task_manager{std::thread::hardware_concurrency() * 2};
+  auto const get_thread_id{[](int miliseconds_count) {
+    auto const thread_id{std::this_thread::get_id()};
+    std::this_thread::sleep_for(1ms * miliseconds_count);
+    return std::format("<< {} >>\n", thread_id);
+  }};
 
-  //std::this_thread::sleep_for(200ms);
-  //task_manager.Run(get_thread_id);
-  //task_manager.Run(get_thread_id);
-  //task_manager.Run(get_thread_id);
-  //task_manager.Run(get_thread_id);
-  //task_manager.Run(get_thread_id);
-  //task_manager.Run(get_thread_id);
-  //task_manager.Run(get_thread_id);
-  //task_manager.Run(get_thread_id);
-  //task_manager.Run(get_thread_id);
-  //task_manager.Run(get_thread_id);
-  //task_manager.WaitForAll();
+  auto const futures{ 
+    std::views::iota(1, 41) |
+    std::views::transform([&](auto const& i) { return task_manager.Run(get_thread_id, 100 * i); }) | 
+    std::ranges::to<std::vector>()
+  };
+  for (auto const& futa : futures) {
+    std::cout << futa.GetResult();
+  }
   
   Promise<int> ticket{};
   auto fut{ticket.GetFuture()};

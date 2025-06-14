@@ -11,7 +11,7 @@ class Future {
  public:
   Future(std::shared_ptr<SharedState<T>> state) noexcept : state_{state} {}
 
-  T GetResult() noexcept {
+  T GetResult() const noexcept {
     return state_->Get();
   }
 

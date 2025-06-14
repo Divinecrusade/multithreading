@@ -8,10 +8,12 @@ namespace multithreading::futurama {
 class Task {
  public:
   Task() = default;
-  Task(Task&&) = default;
-  Task(Task const&) = default;
 
-  template<class F, typename... Args>
+  operator bool() const {
+    return static_cast<bool>(execute_);
+  }
+
+  template <class F, typename... Args>
   static auto make(F&& functor, Args&&... params) {
     Promise<std::invoke_result_t<F, Args...>> promise{};
     auto future{promise.GetFuture()};
@@ -20,29 +22,23 @@ class Task {
       std::move(future)
     );
   }
-  void operator()() { execute_(); }
+  void operator()() const { execute_(); }
 
  private:
-  template<class F, class P, typename... Args>
+  template <class F, class P, typename... Args>
   Task(F&& functor, P&& promise, Args&&... params) 
-  //:
-  //execute_{ [
-  //  functor = std::forward(functor),
-  //  promise = std::forward(promise),
-  //  ...params = std::forward(params)
-  //]() {
-  //  promise.SetResult(functor(params...));
-  //}}
-  {
-    execute_ = 
-      [functor = std::forward<F>(functor), promise = std::forward<P>(promise),
-       ... params = std::forward<Args>(params)]() mutable {
-        promise.SetResult(functor(params...));
-      };
-  }
+  :
+  execute_{ [
+    functor = std::forward<F>(functor),
+    promise = std::forward<P>(promise),
+    ...params = std::forward<Args>(params)
+  ]() mutable {
+    promise.SetResult(functor(params...));
+  }}
+  {}
 
  private:
-  std::function<void()> execute_;
+  std::function<void()> execute_{};
 };
 } // multithreading::futurama
 

@@ -4,12 +4,12 @@
 #include "Future.hpp"
 
 namespace multithreading::futurama{ 
-template<class T>
+template <class T>
 class Promise {
  public:
-  template<class R>
-  void SetResult(R&& result) {
-    state_->Set(std::forward<R>(result));
+  template <class... R>
+  void SetResult(R&&... result) {
+    state_->Set(std::forward<R>(result)...);
   }
 
   Future<T> GetFuture() const {

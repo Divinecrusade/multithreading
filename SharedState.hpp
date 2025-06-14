@@ -9,7 +9,7 @@ namespace multithreading::futurama {
 template <class T>
 class SharedState {
  public:
-  template<class R>
+  template <class R>
   requires std::constructible_from<T, R>
   void Set(R&& new_val) noexcept {
     sem.release();
@@ -26,6 +26,21 @@ class SharedState {
  private:
   std::binary_semaphore sem{0};
   std::optional<T> val_{std::nullopt};
+};
+
+template <>
+class SharedState<void> {
+ public:
+  void Set() noexcept {
+    sem.release();
+  }
+
+  void Get() noexcept {
+    sem.acquire();
+  }
+
+ private:
+  std::binary_semaphore sem{0};
 };
 }  // namespace multithreading::futurama
 

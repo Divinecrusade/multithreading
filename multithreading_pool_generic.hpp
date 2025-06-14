@@ -1,6 +1,7 @@
 #ifndef MULTITHREADING_POOL_GENERIC_HPP
 #define MULTITHREADING_POOL_GENERIC_HPP
 
+#include "futurama_Task.hpp"
 #include <algorithm>
 #include <cassert>
 #include <condition_variable>
@@ -14,8 +15,6 @@
 #include <vector>
 
 namespace multithreading::pool::generic {
-
-using Task = std::function<void()>;
 
 class Master {
  private:
@@ -52,11 +51,15 @@ class Master {
     }
   }
 
-  void Run(Task task) noexcept {
+  template <class F, typename... Args>
+  auto Run(F&& functor, Args&&... params) noexcept {
+    auto [task, future] {multithreading::futurama::Task::make(std::forward<F>(functor), std::forward<Args>(params)...)};
     std::ignore = std::lock_guard{queue_mtx_},
     remaining_tasks_.push(std::move(task));
 
     queue_cv_.notify_one();
+
+    return future;
   }
 
   void WaitForAll() {
@@ -65,7 +68,7 @@ class Master {
   }
 
  private:
-  Task GetTask(std::stop_token const& st) noexcept {
+  multithreading::futurama::Task GetTask(std::stop_token const& st) noexcept {
     std::unique_lock lk{queue_mtx_};
     queue_cv_.wait(lk, st,
                    [&tasks = remaining_tasks_]() { return !tasks.empty(); });
@@ -82,7 +85,7 @@ class Master {
   }
 
  private:
-  std::queue<Task> remaining_tasks_{};
+  std::queue<multithreading::futurama::Task> remaining_tasks_{};
 
   std::condition_variable wait_cv_{};
   std::mutex queue_mtx_{};
