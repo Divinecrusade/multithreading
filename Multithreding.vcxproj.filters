@@ -68,12 +68,6 @@
     <ClInclude Include="SharedState.hpp">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="Promise.hpp">
-      <Filter>Файлы заголовков</Filter>
-    </ClInclude>
-    <ClInclude Include="Future.hpp">
-      <Filter>Файлы заголовков</Filter>
-    </ClInclude>
     <ClInclude Include="futurama_Task.hpp">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>

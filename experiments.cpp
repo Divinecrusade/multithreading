@@ -131,32 +131,24 @@ void experiments::multithread::test_pool_generic() {
     return std::format("<< {} >>\n", thread_id);
   }};
 
-  auto const futures{ 
+  auto futures{ 
     std::views::iota(1, 41) |
     std::views::transform([&](auto const& i) { return task_manager.Run(get_thread_id, i); }) | 
     std::ranges::to<std::vector>()
   };
-  for (auto const& futa : futures) {
+  for (auto& futa : futures) {
     try {
-      std::cout << futa.GetResult();
+      std::cout << futa.get();
     } catch (...) {
       std::cerr << "exception from thread\n";
     }
   }
-  
-  Promise<int> ticket{};
-  auto fut{ticket.GetFuture()};
-  std::thread{ [](Promise<int> state) {
-    std::this_thread::sleep_for(3s);
-    state.SetResult(69);
-  }, std::move(ticket) }.detach();
-  std::clog << fut.GetResult() << std::endl;
 
   auto [task, futa] {multithreading::futurama::Task::make([](int x) { std::this_thread::sleep_for(2s); return x + 40'000; }, 69)};
-  std::thread{task}.detach();
-  while (!futa.IsReady()) {
+  std::thread{std::move(task)}.detach();
+  while (futa.wait_for(400ms) != std::future_status::ready) {
     std::clog << "Waiting...\n";
     std::this_thread::sleep_for(400ms);
   }
-  std::clog << "Result is " << futa.GetResult() << "\n";
+  std::clog << "Result is " << futa.get() << "\n";
 }

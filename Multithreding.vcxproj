@@ -142,13 +142,11 @@
     <ClInclude Include="data_generation.hpp" />
     <ClInclude Include="experiments.hpp" />
     <ClInclude Include="futurama_Task.hpp" />
-    <ClInclude Include="Future.hpp" />
     <ClInclude Include="HeavyTask.hpp" />
     <ClInclude Include="Job.hpp" />
     <ClInclude Include="LightTask.hpp" />
     <ClInclude Include="multithreading_pool_generic.hpp" />
     <ClInclude Include="multithreading_queue.hpp" />
-    <ClInclude Include="Promise.hpp" />
     <ClInclude Include="SharedState.hpp" />
     <ClInclude Include="StatisticChunk.hpp" />
     <ClInclude Include="Task.hpp" />

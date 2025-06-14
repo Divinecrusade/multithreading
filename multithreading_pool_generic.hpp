@@ -26,7 +26,7 @@ class Master {
 
    private:
     void KernelRoutine(std::stop_token const& st) const noexcept {
-      while (auto const cur_task{tasks_pool_.GetTask(st)}) {
+      while (auto cur_task{tasks_pool_.GetTask(st)}) {
         cur_task();
       }
     }
@@ -59,7 +59,7 @@ class Master {
 
     queue_cv_.notify_one();
 
-    return future;
+    return std::move(future);
   }
 
   void WaitForAll() {
@@ -68,17 +68,17 @@ class Master {
   }
 
  private:
-  multithreading::futurama::Task GetTask(std::stop_token const& st) noexcept {
+  multithreading::futurama::Task GetTask(std::stop_token const& st) {
     std::unique_lock lk{queue_mtx_};
     queue_cv_.wait(lk, st,
                    [&tasks = remaining_tasks_]() { return !tasks.empty(); });
     if (!st.stop_requested()) {
-      auto const cur_task{std::move(remaining_tasks_.front())};
+      auto cur_task{std::move(remaining_tasks_.front())};
       remaining_tasks_.pop();
       if (remaining_tasks_.empty()) {
         wait_cv_.notify_all();
       }
-      return cur_task;
+      return std::move(cur_task);
     } else {
       return {};
     }
