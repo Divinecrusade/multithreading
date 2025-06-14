@@ -2,7 +2,7 @@
 #include "multithreading.hpp"
 #include "multithreading_queue.hpp"
 #include "multithreading_pool_generic.hpp"
-#include "Promise.hpp"
+#include "futurama_Task.hpp"
 
 #include <ranges>
 #include <iostream>
@@ -149,4 +149,8 @@ void experiments::multithread::test_pool_generic() {
     state.SetResult(69);
   }, std::move(ticket) }.detach();
   std::clog << fut.GetResult();
+
+  auto [task, futa] {multithreading::futurama::Task::make([](int x) { std::this_thread::sleep_for(2s); return x + 40'000; }, 69)};
+  std::thread{task}.detach();
+  std::clog << futa.GetResult();
 }
