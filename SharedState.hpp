@@ -24,6 +24,15 @@ class SharedState {
     }
   }
 
+  bool IsReady() {
+    if (sem_.try_acquire()) {
+      sem_.release();
+      return true;
+    } else {
+      return false;
+    }
+  }
+
  private:
   std::binary_semaphore sem_{0};
   std::variant<std::monostate, T, std::exception_ptr> val_{};

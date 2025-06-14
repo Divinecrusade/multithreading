@@ -150,9 +150,13 @@ void experiments::multithread::test_pool_generic() {
     std::this_thread::sleep_for(3s);
     state.SetResult(69);
   }, std::move(ticket) }.detach();
-  std::clog << fut.GetResult();
+  std::clog << fut.GetResult() << std::endl;
 
   auto [task, futa] {multithreading::futurama::Task::make([](int x) { std::this_thread::sleep_for(2s); return x + 40'000; }, 69)};
   std::thread{task}.detach();
-  std::clog << futa.GetResult();
+  while (!futa.IsReady()) {
+    std::clog << "Waiting...\n";
+    std::this_thread::sleep_for(400ms);
+  }
+  std::clog << "Result is " << futa.GetResult() << "\n";
 }

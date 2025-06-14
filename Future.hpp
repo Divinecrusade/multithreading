@@ -15,6 +15,10 @@ class Future {
     return state_->Get();
   }
 
+  bool IsReady() const {
+    return state_->IsReady();
+  }
+
  private:
   std::shared_ptr<SharedState<T>> state_;
 };
