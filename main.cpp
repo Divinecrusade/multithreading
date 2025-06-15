@@ -17,7 +17,7 @@ int main(int argc, char const* argv[]) {
       cmd_args::OPTIONS);
   program.parse_args(argc, argv);
 
-  auto const process_dataset{[&](auto const& dataset,
+  auto const process_dataset{[&](auto dataset,
                                  std::string const& filename_suffix) {
     static std::string const BASE_FILENAME{"timings"};
     static std::string const FILENAME_SEPARATOR{"_"};
@@ -44,6 +44,10 @@ int main(int argc, char const* argv[]) {
                                              filename_suffix +
                                              FILENAME_SEPARATOR + "q"s);
     }
+    if (program[cmd_args::USE_MULTITHREADING_POOL_GENERIC] == true) {
+      std::clog << "Multithreading pool starts...\n";
+      experiments::multithread::process_data_with_pool(std::move(dataset));
+    }
   }};
 
   if (program[cmd_args::GENERATE_EVENED_DATASET] == true) {
@@ -53,10 +57,6 @@ int main(int argc, char const* argv[]) {
   if (program[cmd_args::GENERATE_STACKED_DATASET] == true) {
     std::clog << "Processing stacked dataset...\n";
     process_dataset(data_generation::get_stacked(), "stacked");
-  }
-  if (program[cmd_args::USE_MULTITHREADING_POOL_GENERIC] == true) {
-    std::clog << "Processing multithreading with generic pool...\n";
-    experiments::multithread::test_pool_generic();
   }
 
   return EXIT_SUCCESS;

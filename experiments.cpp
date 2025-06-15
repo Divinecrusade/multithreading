@@ -116,6 +116,31 @@ experiments::multithread::process_data_with_queue(config::DUMMY_DATA const& data
   return results;
 }
 
+void experiments::multithread::process_data_with_pool(config::DUMMY_DATA&& data) {
+  static constexpr auto pool_adapter{
+      [](Job const& task) { return task.task->do_stuff(); }};
+
+  Task::DUMMY_OUTPUT result{0ULL};
+  using namespace multithreading::pool::generic;
+  Master task_manager{std::thread::hardware_concurrency() * 2};
+  auto futures{data | std::views::join | std::views::transform([&task_manager](auto&& task) {
+                 return task_manager.Run(pool_adapter, std::move(task));
+               }) |
+               std::ranges::to<std::vector>()};
+
+  auto const start_time{std::chrono::steady_clock::now()};
+  for (auto& futa : futures) {
+    result += futa.get();
+  }
+  auto const end_time{std::chrono::steady_clock::now()};
+
+  std::clog << "Result: " << result << " | Done in "
+            << std::chrono::duration_cast<std::chrono::milliseconds>(end_time -
+                                                                     start_time)
+                   .count()
+            << "ms - multithread pool\n";
+}
+
 void experiments::multithread::test_pool_generic() {
   using namespace multithreading::pool::generic;
   using namespace std::chrono_literals;
@@ -153,3 +178,5 @@ void experiments::multithread::test_pool_generic() {
   }
   std::clog << "Result is " << futa.get() << "\n";
 }
+
+
