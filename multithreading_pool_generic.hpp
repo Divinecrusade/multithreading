@@ -40,7 +40,7 @@ class Master {
  public:
   Master(std::size_t slaves_count) noexcept {
     slaves_.reserve(slaves_count);
-    for (auto i : std::views::iota(1ULL, slaves_count)) {
+    for (auto i : std::views::iota(0ULL, slaves_count)) {
       slaves_.emplace_back(*this);
     }
   }

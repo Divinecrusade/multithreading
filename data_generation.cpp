@@ -1,4 +1,5 @@
 #include "data_generation.hpp"
+#include <cassert>
 
 namespace data_generation {
 config::DUMMY_DATA get_evened() {
@@ -26,6 +27,21 @@ config::DUMMY_DATA get_stacked() {
       return typeid(*dummy_process.task.get()) == typeid(HeavyTask const&);
     });
   }
+  return dataset;
+}
+std::vector<Job> get_dynamic(
+  std::size_t all_tasks_count,
+  std::size_t heavy_tasks_count) {
+  assert(all_tasks_count >= heavy_tasks_count);
+
+  std::vector<Job> dataset{};
+  dataset.reserve(all_tasks_count);
+
+  std::generate_n(std::back_inserter(dataset), heavy_tasks_count,
+                  [] { return Job{std::make_unique<HeavyTask>()}; });
+  std::generate_n(std::back_inserter(dataset), all_tasks_count - heavy_tasks_count,
+                  [] { return Job{std::make_unique<LightTask>()}; });
+
   return dataset;
 }
 }

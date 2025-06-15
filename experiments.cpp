@@ -122,8 +122,35 @@ void experiments::multithread::process_data_with_pool(config::DUMMY_DATA&& data)
 
   Task::DUMMY_OUTPUT result{0ULL};
   using namespace multithreading::pool::generic;
-  Master task_manager{std::thread::hardware_concurrency() * 2};
+  Master task_manager{config::SLAVES_COUNT};
   auto futures{data | std::views::join | std::views::transform([&task_manager](auto&& task) {
+                 return task_manager.Run(pool_adapter, std::move(task));
+               }) |
+               std::ranges::to<std::vector>()};
+
+  auto const start_time{std::chrono::steady_clock::now()};
+  for (auto& futa : futures) {
+    result += futa.get();
+  }
+  auto const end_time{std::chrono::steady_clock::now()};
+
+  std::clog << "Result: " << result << " | Done in "
+            << std::chrono::duration_cast<std::chrono::milliseconds>(end_time -
+                                                                     start_time).count()
+            << "ms - multithread pool\n";
+}
+
+void experiments::multithread::process_data_with_pool(
+    std::vector<Job>&& data, std::size_t async_threads_count,
+    std::size_t compute_threads_count) {
+  static constexpr auto pool_adapter{
+      [](Job const& task) { return task.task->do_stuff(); }};
+
+  Task::DUMMY_OUTPUT result{0ULL};
+  using namespace multithreading::pool::generic;
+  Master task_manager{compute_threads_count};
+  auto futures{data |
+               std::views::transform([&task_manager](auto&& task) {
                  return task_manager.Run(pool_adapter, std::move(task));
                }) |
                std::ranges::to<std::vector>()};
@@ -140,43 +167,3 @@ void experiments::multithread::process_data_with_pool(config::DUMMY_DATA&& data)
                    .count()
             << "ms - multithread pool\n";
 }
-
-void experiments::multithread::test_pool_generic() {
-  using namespace multithreading::pool::generic;
-  using namespace std::chrono_literals;
-
-  Master task_manager{std::thread::hardware_concurrency() * 2};
-  auto const get_thread_id{[](int miliseconds_count) {
-    if (miliseconds_count % 4 == 0) throw std::runtime_error{"test"};
-
-    auto const thread_id{std::this_thread::get_id()};
-    std::this_thread::sleep_for(1ms * (miliseconds_count * 100));
-    return std::format("<< {} >>\n", thread_id);
-  }};
-
-  auto futures{ 
-    std::views::iota(1, 41) |
-    std::views::transform([&](auto const& i) { return task_manager.Run(get_thread_id, i); }) | 
-    std::ranges::to<std::vector>()
-  };
-  for (auto& futa : futures) {
-    try {
-      std::cout << futa.get();
-    } catch (...) {
-      std::cerr << "exception from thread\n";
-    }
-  }
-
-  std::packaged_task<int()> task{std::bind([](int x) {
-    std::this_thread::sleep_for(2s);
-    return x + 40'000; }, 69)
-  };
-  auto futa{task.get_future()};
-  std::thread{std::move(task)}.detach();
-  while (futa.wait_for(400ms) != std::future_status::ready) {
-    std::clog << "Waiting...\n";
-  }
-  std::clog << "Result is " << futa.get() << "\n";
-}
-
-

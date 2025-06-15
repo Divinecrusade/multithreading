@@ -15,6 +15,22 @@ int main(int argc, char const* argv[]) {
                   true));
       },
       cmd_args::OPTIONS);
+  program.at(cmd_args::ASYNC_THREADS_COUNT)
+    .nargs(1)
+    .scan<'u', std::size_t>()
+    .default_value(config::PoolParams::DEFAULT_ASYNC_THREADS_COUNT);
+  program.at(cmd_args::COMPUTE_THREADS_COUNT)
+    .nargs(1)
+    .scan<'u', std::size_t>()
+    .default_value(config::PoolParams::DEFAULT_COMPUTE_THREADS_COUNT);
+  program.at(cmd_args::DATASET_SIZE)
+    .nargs(1)
+    .scan<'u', std::size_t>()
+    .default_value(config::PoolParams::DEFAULT_DATASET_SIZE);
+  program.at(cmd_args::HEAVY_TASKS_COUNT)
+    .nargs(1)
+    .scan<'u', std::size_t>()
+    .default_value(config::PoolParams::DEFAULT_HEAVY_TASKS_COUNT);
   program.parse_args(argc, argv);
 
   auto const process_dataset{[&](auto dataset,
@@ -57,6 +73,15 @@ int main(int argc, char const* argv[]) {
   if (program[cmd_args::GENERATE_STACKED_DATASET] == true) {
     std::clog << "Processing stacked dataset...\n";
     process_dataset(data_generation::get_stacked(), "stacked");
+  }
+  if (program[cmd_args::USE_MULTITHREADING_POOL_DYNAMIC] == true) {
+    std::clog << "Processing data dynamic configured...\n";
+    experiments::multithread::process_data_with_pool(
+        data_generation::get_dynamic(
+            program.get<std::size_t>(cmd_args::DATASET_SIZE),
+            program.get<std::size_t>(cmd_args::HEAVY_TASKS_COUNT)),
+        program.get<std::size_t>(cmd_args::ASYNC_THREADS_COUNT),
+        program.get<std::size_t>(cmd_args::COMPUTE_THREADS_COUNT));
   }
 
   return EXIT_SUCCESS;
