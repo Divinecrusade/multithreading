@@ -16,11 +16,11 @@
     },
     {
       "Id": "5938b979-a9e5-4bf2-823d-be9c493c968a",
-      "Command": "--dataset-size 40"
+      "Command": "--dataset-size 4000"
     },
     {
       "Id": "b1ed8b37-c378-43d6-926a-b1c0a40310c2",
-      "Command": "--heavy-tasks-count 2"
+      "Command": "--heavy-tasks-count 200"
     },
     {
       "Id": "a6945cb1-b667-46e6-b0fd-0d1e71043af8",
