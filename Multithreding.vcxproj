@@ -146,6 +146,7 @@
     <ClInclude Include="HeavyTask.hpp" />
     <ClInclude Include="Job.hpp" />
     <ClInclude Include="LightTask.hpp" />
+    <ClInclude Include="multithreading_pool_fun.hpp" />
     <ClInclude Include="multithreading_pool_generic.hpp" />
     <ClInclude Include="multithreading_queue.hpp" />
     <ClInclude Include="SharedState.hpp" />

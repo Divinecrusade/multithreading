@@ -84,8 +84,7 @@ int main(int argc, char const* argv[]) {
         program.get<std::size_t>(cmd_args::COMPUTE_THREADS_COUNT));
   }
 
-  //experiments::multithread::test_combined_data();
-  experiments::multithread::test_combined_data(
+  experiments::multithread::test_combined_data_with_functions(
     data_generation::get_dynamic(
       program.get<std::size_t>(cmd_args::DATASET_SIZE),
       program.get<std::size_t>(cmd_args::HEAVY_TASKS_COUNT)));

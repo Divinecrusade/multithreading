@@ -8,6 +8,9 @@ class TaskExecuter {
  private:
   TaskExecuter(std::size_t logical_cores_count);
 
+ private:
+  static TaskExecuter& GetEntity();
+
  public:
   template <class F, typename... Args>
   static auto RunAsyncTask(F&& functor, Args&&... params) {
@@ -33,9 +36,6 @@ class TaskExecuter {
       return result.get();
     });
   }
-
- private:
-  static TaskExecuter& GetEntity();
 
  private:
   generic::Master async_queue;
