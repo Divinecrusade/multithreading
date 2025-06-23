@@ -135,8 +135,6 @@
     <ClCompile Include="experiments.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="multithreading.hpp" />
-    <ClCompile Include="multithreading_pool_async.cpp" />
-    <ClCompile Include="multithreading_pool_async.hpp" />
     <ClCompile Include="StatisticChunk.cpp" />
   </ItemGroup>
   <ItemGroup>

@@ -2,7 +2,6 @@
 #include "multithreading.hpp"
 #include "multithreading_queue.hpp"
 #include "multithreading_pool_generic.hpp"
-#include "multithreading_pool_async.hpp"
 #include "multithreading_pool_fun.hpp"
 
 #include <ranges>
@@ -171,72 +170,7 @@ void experiments::multithread::process_data_with_pool(
             << "ms - multithread pool\n";
 }
 
-void experiments::multithread::test_combined_data() {
-  using namespace multithreading::pool::async;
-  using namespace std::chrono_literals;
-
-  auto const get_thread_id{[](int miliseconds_count) {
-    std::clog << "starting process...\n";
-    auto const thread_id{std::this_thread::get_id()};
-    std::this_thread::sleep_for(1ms * (miliseconds_count));
-    return std::format("<< {} >>\n", thread_id);
-  }};
-
-  auto const get_miliseconds{[](int miliseconds_count) {
-    std::clog << "starting async...\n";
-    std::this_thread::sleep_for(2s + 50ms * (miliseconds_count % 50));
-    return miliseconds_count * (100 + miliseconds_count % 20);
-  }};
-  
-  auto futures{std::views::iota(1, 101) |
-               std::views::transform([&](auto const& i) {
-                  return TaskExecuter::RunCombinedTask(get_miliseconds, get_thread_id, i);
-               }) |
-               std::ranges::to<std::vector>()};
-  for (auto& futa : futures) {
-    try {
-      std::cout << futa.get();
-    } catch (std::runtime_error) {
-      std::cerr << "exception from thread\n";
-    }
-  }
-}
-
-void experiments::multithread::test_combined_data_with_singleton(std::vector<Job>&& data) {
-  using namespace multithreading::pool::async;
-  using namespace std::chrono_literals;
-
-  static constexpr auto task_async_delay { 
-    [] { std::this_thread::sleep_for(400ms); }
-  };
-  static constexpr auto pool_adapter{[](Job&& task) {
-    return task.task->do_stuff(); 
-  }};
-  
-  Task::DUMMY_OUTPUT result{0ULL};
-  auto futures{data | std::views::transform([&](auto&& task) {
-                 return TaskExecuter::RunAsyncTask([&] { 
-                  task_async_delay();
-                  auto f{TaskExecuter::RunProcessTask(pool_adapter, std::move(task))};
-                  return f.get();
-                 });
-               }) |
-               std::ranges::to<std::vector>()};
-
-  auto const start_time{std::chrono::steady_clock::now()};
-  for (auto& futa : futures) {
-    result += futa.get();
-  }
-  auto const end_time{std::chrono::steady_clock::now()};
-
-  std::clog << "Result: " << result << " | Done in "
-            << std::chrono::duration_cast<std::chrono::milliseconds>(end_time -
-                                                                     start_time)
-                   .count()
-            << "ms - multithread pool async singleton\n";
-}
-
-void experiments::multithread::test_combined_data_with_functions(std::vector<Job>&& data) {
+void experiments::multithread::test_combined_data(std::vector<Job>&& data) {
   using namespace multithreading::pool::fun;
   using namespace std::chrono_literals;
 

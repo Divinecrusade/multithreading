@@ -14,9 +14,7 @@ void process_data_with_pool(config::DUMMY_DATA&& data);
 void process_data_with_pool(std::vector<Job>&& data,
                             std::size_t async_threads_count,
                             std::size_t compute_threads_count);
-void test_combined_data();
-void test_combined_data_with_singleton(std::vector<Job>&& data);
-void test_combined_data_with_functions(std::vector<Job>&& data);
+void test_combined_data(std::vector<Job>&& data);
 }
 }
 

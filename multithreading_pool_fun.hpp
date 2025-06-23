@@ -77,11 +77,6 @@ class Master {
     return future;
   }
 
-  void WaitForAll() {
-    std::unique_lock lk{queue_mtx_};
-    wait_cv_.wait(lk, [&tasks = remaining_tasks_]() { return tasks.empty(); });
-  }
-
  private:
   std::move_only_function<void()> GetTask(std::stop_token const& st) {
     std::unique_lock lk{queue_mtx_};
@@ -90,9 +85,6 @@ class Master {
     if (!st.stop_requested()) {
       auto cur_task{std::move(remaining_tasks_.front())};
       remaining_tasks_.pop();
-      if (remaining_tasks_.empty()) {
-        wait_cv_.notify_all();
-      }
       return std::move(cur_task);
     } else {
       return {};
@@ -102,7 +94,6 @@ class Master {
  private:
   std::queue<std::move_only_function<void()>> remaining_tasks_{};
 
-  std::condition_variable wait_cv_{};
   std::mutex queue_mtx_{};
   std::condition_variable_any queue_cv_{};
   std::vector<Slave> slaves_{};
