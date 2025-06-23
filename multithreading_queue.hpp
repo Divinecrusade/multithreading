@@ -33,7 +33,7 @@ class Master {
       return slaves_finished_job_count == config::SLAVES_COUNT;
     });
     slaves_finished_job_count = 0ull;
-    assert(cur_task >= cur_workload.size());
+    assert(cur_task >= gsl::narrow_cast<gsl::index>(cur_workload.size()));
   }
 
   void add_workload(config::CHUNK_VIEW new_workload) {
@@ -43,7 +43,7 @@ class Master {
 
   std::optional<config::SLAVE_TASK> get_task() {
     auto const old_task{cur_task++};
-    if (old_task >= cur_workload.size()) return std::nullopt;
+    if (old_task >= gsl::narrow_cast<gsl::index>(cur_workload.size())) return std::nullopt;
     return cur_workload.cbegin() + old_task;
   }
 
