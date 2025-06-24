@@ -177,17 +177,18 @@ void experiments::multithread::process_data_with_pool_stealing(
   using namespace std::chrono_literals;
 
   static constexpr auto task_async_delay{
-      [] { std::this_thread::sleep_for(40ms); return 20.; }};
+      [] { std::this_thread::sleep_for(0ms); return 2; }};
   static constexpr auto pool_adapter{
       [](Job const& task) { return task.task->do_stuff(); }};
 
-  auto const logical_cores_number{std::thread::hardware_concurrency() * 2};
-  TaskExecuter cur_exec{logical_cores_number * 10, logical_cores_number};
+  auto const logical_cores_number{std::thread::hardware_concurrency()};
+  TaskExecuter cur_exec{logical_cores_number * 5, logical_cores_number};
   Task::DUMMY_OUTPUT result{0ULL};
   auto futures{
       data | std::views::transform([&](auto const& task) {
-        return cur_exec.async_queue.Dispatch([&task] {
-          auto tmp{task_async_delay()};
+        return RunAsyncTask([&task] {
+          auto tmp{SyncOn(RunAsyncTask(task_async_delay))};
+          //auto tmp{RunAsyncTask(task_async_delay).get()};
           return RunProcessTask(pool_adapter, task).get() / tmp;
         });
       }) |

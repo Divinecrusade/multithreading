@@ -94,6 +94,15 @@ class Master {
   template <class F>
   friend auto SyncOn(F&& future) -> decltype(std::declval<F>().get());
 
+  void TryTask() {
+    if (std::unique_lock lk{queue_mtx_}; !remaining_tasks_.empty()) {
+      auto task{std::move(remaining_tasks_.front())};
+      remaining_tasks_.pop();
+      lk.unlock();
+      task();
+    }
+  }
+
  private:
   std::queue<std::move_only_function<void()>> remaining_tasks_{};
 
@@ -106,7 +115,7 @@ struct TaskExecuter {
   TaskExecuter(std::size_t async_cores_count, std::size_t process_cores_count)
       : async_queue{async_cores_count, this},
         process_queue{process_cores_count, this}
-  {}
+  { std::ignore = ThisExecuter(this); }
 
   Master async_queue;
   Master process_queue;
@@ -122,6 +131,15 @@ template <class F, typename... Args>
 inline auto RunProcessTask(F&& functor, Args&&... params) {
   return ThisExecuter().process_queue.Dispatch(std::forward<F>(functor),
                                                std::forward<Args>(params)...);
+}
+
+template <class F>
+inline auto SyncOn(F&& future) -> decltype(std::declval<F>().get()) {
+  using namespace std::chrono_literals;
+  while (future.wait_for(0s) != std::future_status::ready) {
+    ThisExecuter().async_queue.TryTask();
+  }
+  return future.get();
 }
 }  // namespace multithreading::pool::stealing
 
