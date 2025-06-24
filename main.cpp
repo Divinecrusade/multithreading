@@ -83,11 +83,13 @@ int main(int argc, char const* argv[]) {
         program.get<std::size_t>(cmd_args::ASYNC_THREADS_COUNT),
         program.get<std::size_t>(cmd_args::COMPUTE_THREADS_COUNT));
   }
-
-  //experiments::multithread::test_combined_data(
-  //  data_generation::get_dynamic(
-  //    config::PoolParams::DEFAULT_DATASET_SIZE,
-  //    config::DEFAULT_HEAVY_TASKS_COUNT));
+  if (program[cmd_args::USE_MULTITHREADING_STEALING] == true) {
+    std::clog << "Processing data dynamic configured...\n";
+    experiments::multithread::process_data_with_pool_stealing(
+      data_generation::get_dynamic(
+        program.get<std::size_t>(cmd_args::DATASET_SIZE),
+        program.get<std::size_t>(cmd_args::HEAVY_TASKS_COUNT)));
+  }
 
   return EXIT_SUCCESS;
 }

@@ -153,8 +153,8 @@ void experiments::multithread::process_data_with_pool_dynamic(
   using namespace multithreading::pool::generic;
   Master task_manager{compute_threads_count};
   auto futures{data |
-               std::views::transform([&task_manager](auto&& task) {
-                 return task_manager.Run(pool_adapter, std::move(task));
+               std::views::transform([&task_manager](auto const& task) {
+                 return task_manager.Run(pool_adapter, task);
                }) |
                std::ranges::to<std::vector>()};
 
@@ -168,41 +168,40 @@ void experiments::multithread::process_data_with_pool_dynamic(
             << std::chrono::duration_cast<std::chrono::milliseconds>(end_time -
                                                                      start_time)
                    .count()
-            << "ms - multithread pool dynamic\n";
+            << "ms - multithread pool\n";
 }
 
 void experiments::multithread::process_data_with_pool_stealing(
     std::vector<Job> const& data) {
-  //using namespace multithreading::pool::stealing;
-  //using namespace std::chrono_literals;
+  using namespace multithreading::pool::stealing;
+  using namespace std::chrono_literals;
 
-  //static constexpr auto task_async_delay{
-  //    [] { std::this_thread::sleep_for(40ms); }};
-  //static constexpr auto pool_adapter{
-  //    [](Job&& task) { return task.task->do_stuff(); }};
+  static constexpr auto task_async_delay{
+      [] { std::this_thread::sleep_for(40ms); return 20.; }};
+  static constexpr auto pool_adapter{
+      [](Job const& task) { return task.task->do_stuff(); }};
 
-  //auto const logical_cores_number{std::thread::hardware_concurrency() * 2};
-  //TaskExecuter cur_exec{logical_cores_number * 10, logical_cores_number};
-  //Task::DUMMY_OUTPUT result{0ULL};
-  //auto futures{
-  //    data | std::views::transform([&](auto&& task) {
-  //      return RunAsyncTask([&task] {
-  //        RunAsyncTask(task_async_delay);
-  //        auto f{RunProcessTask(pool_adapter, std::move(task))};
-  //        return f.get();
-  //      });
-  //    }) |
-  //    std::ranges::to<std::vector>()};
+  auto const logical_cores_number{std::thread::hardware_concurrency() * 2};
+  TaskExecuter cur_exec{logical_cores_number * 10, logical_cores_number};
+  Task::DUMMY_OUTPUT result{0ULL};
+  auto futures{
+      data | std::views::transform([&](auto const& task) {
+        return cur_exec.async_queue.Dispatch([&task] {
+          auto tmp{task_async_delay()};
+          return RunProcessTask(pool_adapter, task).get() / tmp;
+        });
+      }) |
+      std::ranges::to<std::vector>()};
 
-  //auto const start_time{std::chrono::steady_clock::now()};
-  //for (auto& futa : futures) {
-  //  result += futa.get();
-  //}
-  //auto const end_time{std::chrono::steady_clock::now()};
+  auto const start_time{std::chrono::steady_clock::now()};
+  for (auto& futa : futures) {
+    result += futa.get();
+  }
+  auto const end_time{std::chrono::steady_clock::now()};
 
-  //std::clog << "Result: " << result << " | Done in "
-  //          << std::chrono::duration_cast<std::chrono::milliseconds>(end_time -
-  //                                                                   start_time)
-  //                 .count()
-  //          << "ms - multithread pool async functions\n";
+  std::clog << "Result: " << result << " | Done in "
+            << std::chrono::duration_cast<std::chrono::milliseconds>(end_time -
+                                                                     start_time)
+                   .count()
+            << "ms - multithread pool stealing\n";
 }

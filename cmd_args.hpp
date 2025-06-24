@@ -20,6 +20,8 @@ static constexpr auto COMPUTE_THREADS_COUNT{"--compute-threads-count"sv};
 static constexpr auto DATASET_SIZE{"--dataset-size"sv};
 static constexpr auto HEAVY_TASKS_COUNT{"--heavy-tasks-count"sv};
 
+static constexpr auto USE_MULTITHREADING_STEALING{"--multithreading-stealing"sv};
+
 static constexpr std::array OPTIONS{GENERATE_STACKED_DATASET,
                                     GENERATE_EVENED_DATASET,
                                     USE_SINGLETHREADING,
@@ -30,7 +32,8 @@ static constexpr std::array OPTIONS{GENERATE_STACKED_DATASET,
                                     ASYNC_THREADS_COUNT,
                                     COMPUTE_THREADS_COUNT,
                                     DATASET_SIZE,
-                                    HEAVY_TASKS_COUNT};
+                                    HEAVY_TASKS_COUNT,          
+                                    USE_MULTITHREADING_STEALING};
 }  // namespace cmd_args
 
 #endif  // !CMD_ARGS
