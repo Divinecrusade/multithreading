@@ -22,8 +22,9 @@ class Job {
  public:
   Job() = default;
   Job(std::unique_ptr<Task> task_init) : task{std::move(task_init)} {}
+  Job(Job const&) = default;
 
-  std::unique_ptr<Task> task{generate_task()};
+  std::shared_ptr<Task> task{generate_task()};
 };
 
 #endif  // !JOB_HPP

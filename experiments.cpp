@@ -2,7 +2,7 @@
 #include "multithreading.hpp"
 #include "multithreading_queue.hpp"
 #include "multithreading_pool_generic.hpp"
-#include "multithreading_pool_fun.hpp"
+#include "multithreading_pool_stealing.hpp"
 
 #include <ranges>
 #include <iostream>
@@ -117,7 +117,8 @@ experiments::multithread::process_data_with_queue(config::DUMMY_DATA const& data
   return results;
 }
 
-void experiments::multithread::process_data_with_pool(config::DUMMY_DATA&& data) {
+void experiments::multithread::process_data_with_pool(
+    config::DUMMY_DATA const& data) {
   static constexpr auto pool_adapter{
       [](Job const& task) { return task.task->do_stuff(); }};
 
@@ -141,8 +142,8 @@ void experiments::multithread::process_data_with_pool(config::DUMMY_DATA&& data)
             << "ms - multithread pool\n";
 }
 
-void experiments::multithread::process_data_with_pool(
-    std::vector<Job>&& data, 
+void experiments::multithread::process_data_with_pool_dynamic(
+    std::vector<Job> const& data, 
     std::size_t async_threads_count,
     std::size_t compute_threads_count) {
   static constexpr auto pool_adapter{
@@ -167,40 +168,41 @@ void experiments::multithread::process_data_with_pool(
             << std::chrono::duration_cast<std::chrono::milliseconds>(end_time -
                                                                      start_time)
                    .count()
-            << "ms - multithread pool\n";
+            << "ms - multithread pool dynamic\n";
 }
 
-void experiments::multithread::test_combined_data(std::vector<Job>&& data) {
-  using namespace multithreading::pool::fun;
-  using namespace std::chrono_literals;
+void experiments::multithread::process_data_with_pool_stealing(
+    std::vector<Job> const& data) {
+  //using namespace multithreading::pool::stealing;
+  //using namespace std::chrono_literals;
 
-  static constexpr auto task_async_delay{
-      [] { std::this_thread::sleep_for(400ms); }};
-  static constexpr auto pool_adapter{
-      [](Job&& task) { return task.task->do_stuff(); }};
+  //static constexpr auto task_async_delay{
+  //    [] { std::this_thread::sleep_for(40ms); }};
+  //static constexpr auto pool_adapter{
+  //    [](Job&& task) { return task.task->do_stuff(); }};
 
-  auto const logical_cores_number{std::thread::hardware_concurrency() * 2};
-  TaskExecuter cur_exec{logical_cores_number * 10, logical_cores_number};
-  Task::DUMMY_OUTPUT result{0ULL};
-  auto futures{
-      data | std::views::transform([&](auto&& task) {
-        return cur_exec.async_queue.Dispatch([&task] {
-          task_async_delay();
-          auto f{RunProcessTask(pool_adapter, std::move(task))};
-          return f.get();
-        });
-      }) |
-      std::ranges::to<std::vector>()};
+  //auto const logical_cores_number{std::thread::hardware_concurrency() * 2};
+  //TaskExecuter cur_exec{logical_cores_number * 10, logical_cores_number};
+  //Task::DUMMY_OUTPUT result{0ULL};
+  //auto futures{
+  //    data | std::views::transform([&](auto&& task) {
+  //      return RunAsyncTask([&task] {
+  //        RunAsyncTask(task_async_delay);
+  //        auto f{RunProcessTask(pool_adapter, std::move(task))};
+  //        return f.get();
+  //      });
+  //    }) |
+  //    std::ranges::to<std::vector>()};
 
-  auto const start_time{std::chrono::steady_clock::now()};
-  for (auto& futa : futures) {
-    result += futa.get();
-  }
-  auto const end_time{std::chrono::steady_clock::now()};
+  //auto const start_time{std::chrono::steady_clock::now()};
+  //for (auto& futa : futures) {
+  //  result += futa.get();
+  //}
+  //auto const end_time{std::chrono::steady_clock::now()};
 
-  std::clog << "Result: " << result << " | Done in "
-            << std::chrono::duration_cast<std::chrono::milliseconds>(end_time -
-                                                                     start_time)
-                   .count()
-            << "ms - multithread pool async functions\n";
+  //std::clog << "Result: " << result << " | Done in "
+  //          << std::chrono::duration_cast<std::chrono::milliseconds>(end_time -
+  //                                                                   start_time)
+  //                 .count()
+  //          << "ms - multithread pool async functions\n";
 }

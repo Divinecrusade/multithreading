@@ -1,5 +1,5 @@
-#ifndef MULTITHREADING_POOL_FUN_HPP
-#define MULTITHREADING_POOL_FUN_HPP
+#ifndef MULTITHREADING_POOL_STEALING_HPP
+#define MULTITHREADING_POOL_STEALING_HPP
 
 #include <algorithm>
 #include <cassert>
@@ -15,10 +15,10 @@
 #include <vector>
 #include <gsl/gsl>
 
-namespace multithreading::pool::fun {
+namespace multithreading::pool::stealing {
 struct TaskExecuter;
 
-TaskExecuter& ThisExecuter(TaskExecuter* init_executer = nullptr) {
+[[maybe_unused]] TaskExecuter& ThisExecuter([[maybe_unused]] TaskExecuter* init_executer = nullptr) {
   thread_local TaskExecuter* cur_executer{init_executer};
   return *cur_executer;
 }
@@ -85,11 +85,14 @@ class Master {
     if (!st.stop_requested()) {
       auto cur_task{std::move(remaining_tasks_.front())};
       remaining_tasks_.pop();
-      return std::move(cur_task);
+      return cur_task;
     } else {
       return {};
     }
   }
+
+  template <class F>
+  friend auto SyncOn(F&& future) -> decltype(std::declval<F>().get());
 
  private:
   std::queue<std::move_only_function<void()>> remaining_tasks_{};
@@ -103,7 +106,7 @@ struct TaskExecuter {
   TaskExecuter(std::size_t async_cores_count, std::size_t process_cores_count)
       : async_queue{async_cores_count, this},
         process_queue{process_cores_count, this}
-  { }
+  {}
 
   Master async_queue;
   Master process_queue;
@@ -120,6 +123,6 @@ inline auto RunProcessTask(F&& functor, Args&&... params) {
   return ThisExecuter().process_queue.Dispatch(std::forward<F>(functor),
                                                std::forward<Args>(params)...);
 }
-}  // namespace multithreading::pool::fun
+}  // namespace multithreading::pool::stealing
 
-#endif  // !MULTITHREADING_POOL_FUN_HPP
+#endif  // !MULTITHREADING_POOL_STEALING_HPP

@@ -60,9 +60,9 @@ int main(int argc, char const* argv[]) {
                                              filename_suffix +
                                              FILENAME_SEPARATOR + "q"s);
     }
-    if (program[cmd_args::USE_MULTITHREADING_POOL_GENERIC] == true) {
+    if (program[cmd_args::USE_MULTITHREADING_POOL] == true) {
       std::clog << "Multithreading pool starts...\n";
-      experiments::multithread::process_data_with_pool(std::move(dataset));
+      experiments::multithread::process_data_with_pool(dataset);
     }
   }};
 
@@ -74,9 +74,9 @@ int main(int argc, char const* argv[]) {
     std::clog << "Processing stacked dataset...\n";
     process_dataset(data_generation::get_stacked(), "stacked");
   }
-  if (program[cmd_args::USE_MULTITHREADING_POOL_DYNAMIC] == true) {
+  if (program[cmd_args::USE_MULTITHREADING_DYNAMIC] == true) {
     std::clog << "Processing data dynamic configured...\n";
-    experiments::multithread::process_data_with_pool(
+    experiments::multithread::process_data_with_pool_dynamic(
         data_generation::get_dynamic(
             program.get<std::size_t>(cmd_args::DATASET_SIZE),
             program.get<std::size_t>(cmd_args::HEAVY_TASKS_COUNT)),
@@ -84,10 +84,10 @@ int main(int argc, char const* argv[]) {
         program.get<std::size_t>(cmd_args::COMPUTE_THREADS_COUNT));
   }
 
-  experiments::multithread::test_combined_data(
-    data_generation::get_dynamic(
-      config::PoolParams::DEFAULT_DATASET_SIZE,
-      config::DEFAULT_HEAVY_TASKS_COUNT));
+  //experiments::multithread::test_combined_data(
+  //  data_generation::get_dynamic(
+  //    config::PoolParams::DEFAULT_DATASET_SIZE,
+  //    config::DEFAULT_HEAVY_TASKS_COUNT));
 
   return EXIT_SUCCESS;
 }
